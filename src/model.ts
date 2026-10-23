@@ -1,9 +1,6 @@
 /**
  * Loads a rebuilt Cubism model (moc3 + textures + expressions) and drives it.
- *
- * The scraped models ship no motion files, so idle life comes from the
- * framework's procedural effects - CubismEyeBlink and CubismBreath - rather
- * than from .motion3.json playback.
+ * Supports zoom, pan repositioning, procedural breathing, blinking, and lip-sync.
  */
 import { CubismUserModel } from '../vendor/CubismWebFramework/src/model/cubismusermodel';
 import { CubismModelSettingJson } from '../vendor/CubismWebFramework/src/cubismmodelsettingjson';
@@ -49,6 +46,18 @@ export class CompanionModel extends CubismUserModel {
   /** Motion index URL; motions live at character level, shared by costumes. */
   motionsUrl?: string;
 
+  /** Repositioning / Pan and Zoom coordinates */
+  zoom = 1.0;
+  margin = 0.06;
+  offsetX = 0;
+  offsetY = 0;
+
+  setTransform(x: number, y: number, zoom?: number): void {
+    this.offsetX = x;
+    this.offsetY = y;
+    if (typeof zoom === 'number') this.zoom = zoom;
+  }
+
   static async load(
     gl: WebGLRenderingContext,
     baseDir: string,
@@ -61,8 +70,6 @@ export class CompanionModel extends CubismUserModel {
     self.setting = new CubismModelSettingJson(settingBuf, settingBuf.byteLength);
 
     const mocBuf = await fetchBuffer(`${baseDir}/${self.setting.getModelFileName()}`);
-    // read the version straight from the header rather than via the framework,
-    // whose helper for this moved between releases
     self.mocVersion = new Uint8Array(mocBuf)[4];
     const supported = Live2DCubismCore.Version.csmGetLatestMocVersion();
     onStep(`moc3 v${self.mocVersion}, Core supports up to v${supported}`);
@@ -70,10 +77,9 @@ export class CompanionModel extends CubismUserModel {
       throw new Error(`moc3 v${self.mocVersion} is newer than this Core (v${supported})`);
     }
 
-    self.loadModel(mocBuf, true); // consistency-check the moc while we're here
+    self.loadModel(mocBuf, true);
     if (!self.getModel()) throw new Error('Core rejected the moc3');
 
-    // physics is optional and not yet rebuilt for these models
     const physicsFile = self.setting.getPhysicsFileName();
     if (physicsFile) {
       const buf = await fetchBuffer(`${baseDir}/${physicsFile}`);
@@ -109,11 +115,6 @@ export class CompanionModel extends CubismUserModel {
     return self;
   }
 
-  /**
-   * CubismMotion leaves its eye-blink and lip-sync id lists null until the app
-   * supplies them, and dereferences them on the first update — so every loaded
-   * motion needs these, even when the lists are empty.
-   */
   private effectIds(): [csmVector<any>, csmVector<any>] {
     if (!this._effectIds) {
       const eye = new csmVector<any>();
@@ -130,7 +131,6 @@ export class CompanionModel extends CubismUserModel {
   }
   private _effectIds?: [csmVector<any>, csmVector<any>];
 
-  /** Motions are optional — without them she still blinks and breathes. */
   async loadMotions(): Promise<number> {
     if (!this.motionsUrl) return 0;
     const res = await fetch(this.motionsUrl).catch(() => null);
@@ -142,7 +142,6 @@ export class CompanionModel extends CubismUserModel {
 
   private motionsBase = '';
 
-  /** True when no motion is playing, so something else may take the body. */
   get motionIdle(): boolean {
     return !this._motionManager || this._motionManager.isFinished();
   }
@@ -163,13 +162,10 @@ export class CompanionModel extends CubismUserModel {
     return true;
   }
 
-  /** Blink and breathe without any motion files. */
   private setupIdle(): void {
     this._eyeBlink = CubismEyeBlink.create(this.setting);
 
     const id = CubismFramework.getIdManager();
-    // offset, peak, cycle, weight — slow, out-of-phase cycles so the idle never
-    // visibly loops
     const breath = new csmVector<BreathParameterData>();
     for (const [param, offset, peak, cycle, weight] of [
       [DefaultId.ParamAngleX, 0.0, 15.0, 6.5345, 0.5],
@@ -191,13 +187,11 @@ export class CompanionModel extends CubismUserModel {
     if (motion) this._expressionManager.startMotion(motion, false);
   }
 
-  /** Where she should be looking, in -1..1 across the viewport. */
   lookAt(x: number, y: number): void {
     this.lookTarget.x = Math.max(-1, Math.min(1, x));
     this.lookTarget.y = Math.max(-1, Math.min(1, y));
   }
 
-  /** 0..1 mouth openness; set every frame while speaking, 0 when silent. */
   setMouthOpen(v: number): void {
     this.mouthOpen = v;
   }
@@ -214,9 +208,8 @@ export class CompanionModel extends CubismUserModel {
 
   update(dt: number): void {
     const model = this.getModel();
-    model.loadParameters(); // restore last frame, then re-apply everything
+    model.loadParameters();
 
-    // a playing motion owns the pose; blink only runs when nothing else drives it
     let motionPlayed = false;
     if (this._motionManager && !this._motionManager.isFinished()) {
       motionPlayed = this._motionManager.updateMotion(model, dt);
@@ -226,9 +219,7 @@ export class CompanionModel extends CubismUserModel {
     this._expressionManager?.updateMotion(model, dt);
     if (!motionPlayed) this._eyeBlink?.updateParameters(model, dt);
 
-    // Look and speech are layered on top of whatever the motion did, so she can
-    // track the cursor mid-gesture. Applied before physics, so the hair follows.
-    const ease = Math.min(1, 9 * dt); // higher = snappier tracking, lower = floatier
+    const ease = Math.min(1, 9 * dt);
     this.lookCurrent.x += (this.lookTarget.x - this.lookCurrent.x) * ease;
     this.lookCurrent.y += (this.lookTarget.y - this.lookCurrent.y) * ease;
     const { x, y } = this.lookCurrent;
@@ -249,19 +240,8 @@ export class CompanionModel extends CubismUserModel {
     model.update();
   }
 
-  /** <1 pulls the camera back, revealing anything outside the normal framing. */
-  zoom = 1.0;
-  /** Fraction of the viewport left empty around her when fitting. */
-  margin = 0.06;
   private art?: { cx: number; cy: number; w: number; h: number };
 
-  /**
-   * Bounding box of every drawable, in model units.
-   *
-   * This model is cropped mid-thigh, so its art fills only part of the model
-   * canvas - fitting to the canvas would leave a third of the window empty.
-   * Fitting to the art itself frames whatever the model actually draws.
-   */
   private artBounds() {
     if (this.art) return this.art;
     const d = this.getModel()._model.drawables;
@@ -279,19 +259,16 @@ export class CompanionModel extends CubismUserModel {
     return this.art;
   }
 
-  /** Width/height of the drawn artwork - the aspect the window should hold. */
   get artAspect(): number {
     const a = this.artBounds();
     return a.w / a.h;
   }
 
   draw(gl: WebGLRenderingContext, width: number, height: number): void {
-    // fit the model's canvas into the viewport without distorting it
     this.projection.loadIdentity();
     this.projection.scale(1.0, width / height);
     this.projection.multiplyByMatrix(this._modelMatrix);
 
-    // then scale and centre so the artwork fills the viewport
     const a = this.artBounds();
     const m = this._modelMatrix.getArray();
     const aspect = width / height;
@@ -301,8 +278,13 @@ export class CompanionModel extends CubismUserModel {
     const k = Math.min(usable / wClip, usable / hClip) * this.zoom;
     const cx = a.cx * m[0] + m[12];
     const cy = (a.cy * m[5] + m[13]) * aspect;
+
     this.projection.scaleRelative(k, k);
     this.projection.translateRelative(-k * cx, -k * cy);
+    // Apply user customized pan offset in NDC coordinates
+    const mArr = this.projection.getArray();
+    this.projection.translateX(mArr[12] + this.offsetX);
+    this.projection.translateY(mArr[13] + this.offsetY);
 
     const renderer = this.getRenderer();
     renderer.setMvpMatrix(this.projection);

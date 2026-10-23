@@ -1,192 +1,168 @@
 /**
- * Spike harness: prove Cubism 5 Core loads a scraped moc3 v5, render it, and
- * cycle the expressions that came out of the game bundles.
+ * Unified Live2D AI Companion — Main Application Entry Point
+ * Implements Reversed Split-Screen, Model Repositioning, Model Auto-Discovery,
+ * Custom Voice Sample Upload, and Multi-Provider Settings.
  */
 import { CubismFramework, Option } from '../vendor/CubismWebFramework/src/live2dcubismframework';
 import { LogLevel } from '../vendor/CubismWebFramework/src/live2dcubismframework';
 import { CompanionModel } from './model';
 import { installCoreCompat } from './core-compat';
-import {
-  setupPet,
-  report,
-  saveCapture,
-  enableResize,
-  onNextCostume,
-  onCursor,
-  inTauri
-} from './pet';
+import { setupPet, enableResize, onCursor, inTauri } from './pet';
 import { LipSync } from './audio';
-import { Companion } from './companion';
 import { IdleDirector } from './idle';
-import { loadRegistry, pickCostume, resolveModel } from './registry';
+import { loadRegistry, pickCostume, resolveModel, Character, Costume } from './registry';
 
-
-
-// Optional server link. Baked in from VITE_AVATAR_HOST (see .env.example), or
-// set at runtime with localStorage.setItem('avatarHost', 'host:port'), which
-// also lets a shipped build be repointed without a rebuild. Empty is fine —
-// she just runs on her own.
-const AVATAR_HOST: string =
-  localStorage.getItem('avatarHost') ??
-  (import.meta as any).env?.VITE_AVATAR_HOST ??
-  '';
-
-// Which character/costume to show. Models are user-supplied and discovered at
-// runtime, so nothing here names a specific one.
-const WANT_CHARACTER = localStorage.getItem('character') ?? undefined;
-const WANT_COSTUME = localStorage.getItem('costume') ?? undefined;
-
-let voiceUrl = '';
-
+// DOM Elements
 const canvas = document.getElementById('view') as HTMLCanvasElement;
-const hud = document.getElementById('hud') as HTMLDivElement;
-const logEl = document.getElementById('log') as HTMLDivElement;
+const canvasWrapper = document.getElementById('stage-canvas-wrapper') as HTMLDivElement;
+const statusToast = document.getElementById('status-toast') as HTMLDivElement;
+const companionNameEl = document.getElementById('companion-name') as HTMLElement;
+const companionCostumeEl = document.getElementById('companion-costume-label') as HTMLElement;
+const companionInitialEl = document.getElementById('companion-initial') as HTMLElement;
+const selectCharacter = document.getElementById('select-character') as HTMLSelectElement;
+const selectCostume = document.getElementById('select-costume') as HTMLSelectElement;
+const chatMessagesEl = document.getElementById('chat-messages') as HTMLDivElement;
+const chatInput = document.getElementById('chat-input') as HTMLTextAreaElement;
+const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
+const btnClearChat = document.getElementById('btn-clear-chat') as HTMLButtonElement;
+const btnOpenSettings = document.getElementById('btn-open-settings') as HTMLButtonElement;
+const btnCloseSettings = document.getElementById('btn-close-settings') as HTMLButtonElement;
+const btnCancelSettings = document.getElementById('btn-cancel-settings') as HTMLButtonElement;
+const btnSaveSettings = document.getElementById('btn-save-settings') as HTMLButtonElement;
+const settingsModal = document.getElementById('settings-modal') as HTMLDivElement;
 
-const lines: HTMLElement[] = [];
-const log = (msg: string, tone: 'plain' | 'ok' | 'fail' = 'plain') => {
-  const el = document.createElement(tone === 'ok' ? 'b' : tone === 'fail' ? 'i' : 'span');
-  el.textContent = msg; // messages can carry URLs and error text — never innerHTML
-  lines.push(el);
-  logEl.replaceChildren(
-    ...lines.slice(-4).flatMap((n, i) => (i ? [document.createTextNode('\n'), n] : [n]))
-  );
+// Settings Inputs
+const settingProvider = document.getElementById('setting-provider') as HTMLSelectElement;
+const settingBaseUrl = document.getElementById('setting-base-url') as HTMLInputElement;
+const settingApiKey = document.getElementById('setting-api-key') as HTMLInputElement;
+const settingModel = document.getElementById('setting-model') as HTMLInputElement;
+const settingModelSelect = document.getElementById('setting-model-select') as HTMLSelectElement;
+const btnFetchModels = document.getElementById('btn-fetch-models') as HTMLButtonElement;
+const settingTemperature = document.getElementById('setting-temperature') as HTMLInputElement;
+const tempDisplay = document.getElementById('temp-display') as HTMLElement;
+
+// Voice & TTS Inputs
+const settingTtsMaster = document.getElementById('setting-tts-master') as HTMLInputElement;
+const settingTtsEngine = document.getElementById('setting-tts-engine') as HTMLSelectElement;
+const settingOmniVoiceUrl = document.getElementById('setting-omnivoice-url') as HTMLInputElement;
+const settingTtsFallback = document.getElementById('setting-tts-fallback') as HTMLInputElement;
+const settingEdgeVoice = document.getElementById('setting-edge-voice') as HTMLSelectElement;
+const voiceUploadZone = document.getElementById('voice-upload-zone') as HTMLDivElement;
+const voiceFileInput = document.getElementById('voice-file-input') as HTMLInputElement;
+const uploadStatusText = document.getElementById('upload-status-text') as HTMLElement;
+const activeVoicePreview = document.getElementById('active-voice-preview') as HTMLDivElement;
+const activeVoiceName = document.getElementById('active-voice-name') as HTMLElement;
+
+// Position & Zoom Inputs
+const settingZoomSlider = document.getElementById('setting-zoom-slider') as HTMLInputElement;
+const btnPanLeft = document.getElementById('btn-pan-left') as HTMLButtonElement;
+const btnPanRight = document.getElementById('btn-pan-right') as HTMLButtonElement;
+const btnPanUp = document.getElementById('btn-pan-up') as HTMLButtonElement;
+const btnPanDown = document.getElementById('btn-pan-down') as HTMLButtonElement;
+const btnZoomIn = document.getElementById('btn-zoom-in') as HTMLButtonElement;
+const btnZoomOut = document.getElementById('btn-zoom-out') as HTMLButtonElement;
+const btnSavePos = document.getElementById('btn-save-pos') as HTMLButtonElement;
+const btnResetPos = document.getElementById('btn-reset-pos') as HTMLButtonElement;
+const btnModalSavePos = document.getElementById('btn-modal-save-pos') as HTMLButtonElement;
+const btnModalResetPos = document.getElementById('btn-modal-reset-pos') as HTMLButtonElement;
+
+// Telegram Inputs
+const settingTelegramEnabled = document.getElementById('setting-telegram-enabled') as HTMLInputElement;
+const settingTelegramToken = document.getElementById('setting-telegram-token') as HTMLInputElement;
+const settingTelegramAllowed = document.getElementById('setting-telegram-allowed') as HTMLInputElement;
+
+// Discord Inputs
+const settingDiscordEnabled = document.getElementById('setting-discord-enabled') as HTMLInputElement;
+const settingDiscordToken = document.getElementById('setting-discord-token') as HTMLInputElement;
+const settingDiscordChannel = document.getElementById('setting-discord-channel') as HTMLInputElement;
+const settingDiscordAllowed = document.getElementById('setting-discord-allowed') as HTMLInputElement;
+
+// Toast Helper
+function showToast(msg: string, duration = 2800) {
+  if (!statusToast) return;
+  statusToast.textContent = msg;
+  statusToast.style.opacity = '1';
+  setTimeout(() => {
+    statusToast.style.opacity = '0.4';
+  }, duration);
+}
+
+// Emotion mapping for Live2D expressions
+const EMOTION_MAP: Record<string, { expression: string; motionPrefixes: string[] }> = {
+  HAPPY: { expression: 'joy-01', motionPrefixes: ['joy-', 'happy-', 'smile-'] },
+  SAD: { expression: 'sad-01', motionPrefixes: ['sad-', 'disappoint-', 'tear-'] },
+  SURPRISED: { expression: 'surprise-01', motionPrefixes: ['surprise-', 'notice-'] },
+  ANGRY: { expression: 'anger-01', motionPrefixes: ['anger-', 'provoke-'] },
+  THINKING: { expression: 'serious-01', motionPrefixes: ['think-', 'question-'] },
+  NEUTRAL: { expression: 'idle-01', motionPrefixes: ['default-', 'idle-'] }
 };
-const ok = (msg: string) => log(msg, 'ok');
-const fail = (msg: string) => log(msg, 'fail');
 
 async function main() {
-  // sizes the drawing buffer to the window before WebGL sees it
   await setupPet(canvas);
 
   const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
-  if (!gl) return fail('no WebGL context');
+  if (!gl) {
+    showToast('WebGL not supported');
+    return;
+  }
 
-  installCoreCompat(log);
+  installCoreCompat(console.log);
 
   const option = new Option();
   option.logFunction = (m: string) => console.log('[cubism]', m);
   option.loggingLevel = LogLevel.LogLevel_Warning;
   CubismFramework.startUp(option);
   CubismFramework.initialize();
-  log(`Core ${Live2DCubismCore.Version.csmGetVersion()}, ` +
-      `newest moc3 it supports: ${Live2DCubismCore.Version.csmGetLatestMocVersion()}`);
 
-  // a bad registry is the first thing a new install hits, so say what is
-  // wrong on screen rather than only in the console
-  const problems: string[] = [];
+  // Load characters dynamically from backend API
   const characters = await loadRegistry((msg) => {
-    problems.push(msg);
-    fail(msg);
-    report(`registry: ${msg}`);
+    console.warn('[registry]', msg);
+    showToast(msg);
   });
+
   if (!characters.length) {
-    report('no models installed under public/models/');
-    if (!problems.length) {
-      fail('No characters installed. Add one under public/models/ — see README.');
-    }
+    showToast('No characters found in ./Characters');
     return;
   }
 
-  const character =
-    characters.find((c) => c.id === WANT_CHARACTER) ?? characters[0];
-  let current = pickCostume(character, WANT_COSTUME);
-  const { dir, file } = resolveModel(character, current);
-  voiceUrl = `${character.dir}/${character.voice ?? 'voice'}/greet.wav`;
-  log(`${character.name} — ${current.name}`);
+  // Active Character & Costume selection
+  const savedCharId = localStorage.getItem('character');
+  let currentCharacter = characters.find((c) => c.id === savedCharId) ?? characters[0];
+
+  const savedCostumeId = localStorage.getItem('costume');
+  let currentCostume = pickCostume(currentCharacter, savedCostumeId ?? undefined);
+
+  updateCompanionHeader(currentCharacter, currentCostume);
+  populateCharacterSelector(characters, currentCharacter.id);
+  populateCostumeSelector(currentCharacter.costumes, currentCostume.id);
+
+  let { dir, file } = resolveModel(currentCharacter, currentCostume);
+  let voiceUrl = `${currentCharacter.dir}/${currentCharacter.voice ?? 'voice'}/greet.wav`;
 
   let model: CompanionModel;
   try {
+    showToast(`Loading ${currentCharacter.name}...`);
     model = await CompanionModel.load(
       gl,
       dir,
       file,
-      log,
-      character.motions ? `${character.dir}/${character.motions}` : undefined
+      (msg) => console.log('[load]', msg),
+      currentCharacter.motions ? `${currentCharacter.dir}/${currentCharacter.motions}` : undefined
     );
-  } catch (e) {
-    console.error('[load]', e);
-    return fail(`load failed: ${(e as Error).message}`);
+    await model.loadMotions();
+
+    // Restore saved position/zoom for this character and costume
+    restoreModelTransform(currentCharacter.id, currentCostume.id, model);
+    showToast(`Ready: ${currentCharacter.name}`);
+  } catch (err: any) {
+    console.error('[load failed]', err);
+    showToast(`Load failed: ${err.message}`);
+    return;
   }
-  report(`loaded ${character.id}/${current.id} (${characters.length} character(s) installed)`);
-  ok(`rendering — ${model.getModel().getParameterCount()} parameters live`);
+
   const stage = () => model;
   (window as any).__model = stage;
   enableResize(canvas, model.artAspect);
-
-  await model.loadMotions();
-
-  /**
-   * Swaps costume in place. Outfits differ in rig and silhouette, so the old
-   * model's GPU resources are released and the window re-fitted to the new one.
-   */
-  let switching = false;
-  const switchCostume = async (id: string): Promise<void> => {
-    const next = character.costumes.find((c) => c.id === id);
-    if (!next || switching || next.id === current.id) return;
-    switching = true;
-    const previous = model;
-    try {
-      const at = resolveModel(character, next);
-      const fresh = await CompanionModel.load(
-        gl,
-        at.dir,
-        at.file,
-        () => {},
-        character.motions ? `${character.dir}/${character.motions}` : undefined
-      );
-      await fresh.loadMotions();
-      model = fresh;
-      current = next;
-      localStorage.setItem('costume', next.id);
-      previous.release();
-      enableResize(canvas, model.artAspect);
-      report(`costume -> ${next.id} (aspect ${model.artAspect.toFixed(3)})`);
-      log(`costume: ${next.name}`);
-    } catch (e) {
-      report(`costume switch failed: ${(e as Error).message}`);
-    } finally {
-      switching = false;
-    }
-  };
-  (window as any).__switchCostume = switchCostume;
-
-  const cycleCostume = () => {
-    const list = character.costumes;
-    const at = list.findIndex((c) => c.id === current.id);
-    void switchCostume(list[(at + 1) % list.length].id);
-  };
-  onNextCostume(cycleCostume);
-  canvas.addEventListener('auxclick', (e) => {
-    if (e.button === 1) cycleCostume(); // middle-click, for when the tray is hidden
-  });
-
-  if (character.costumes.length > 1) {
-    const picker = document.createElement('select');
-    for (const c of character.costumes) {
-      const opt = new Option(c.name, c.id);
-      opt.selected = c.id === current.id;
-      picker.append(opt);
-    }
-    picker.onchange = () => switchCostume(picker.value);
-    hud.appendChild(picker);
-  }
-
-  for (const name of model.expressions.keys()) {
-    const b = document.createElement('button');
-    b.textContent = name;
-    b.onclick = () => model.setExpression(name);
-    hud.appendChild(b);
-  }
-
-  if (model.motionIndex.length) {
-    const picker = document.createElement('select');
-    picker.append(new Option(`${model.motionIndex.length} motions…`, ''));
-    for (const e of model.motionIndex) {
-      picker.append(new Option(`${e.name}  (${e.duration.toFixed(1)}s)`, e.name));
-    }
-    picker.onchange = () => picker.value && model.playMotion(picker.value);
-    hud.appendChild(picker);
-  }
 
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -194,77 +170,145 @@ async function main() {
   const lipSync = new LipSync();
   (window as any).__lipSync = lipSync;
 
-  // Natively she follows the OS cursor anywhere on screen; the DOM fallback is
-  // for the browser harness, where only in-window movement is visible. Running
-  // both would fight, since they measure from different origins.
-  if (inTauri()) {
-    let firstCursor = true;
-    onCursor((x, y) => {
-      model.lookAt(x, y);
-      if (firstCursor) {
-        firstCursor = false;
-        report(`global cursor tracking live (${x.toFixed(2)}, ${y.toFixed(2)})`);
-      }
-    });
-  } else {
-    const track = (e: MouseEvent) => {
-      const r = canvas.getBoundingClientRect();
-      model.lookAt(
-        ((e.clientX - r.left) / r.width) * 2 - 1,
-        -(((e.clientY - r.top) / r.height) * 2 - 1)
-      );
-    };
-    window.addEventListener('mousemove', track);
-    window.addEventListener('mouseleave', () => model.lookAt(0, 0));
-  }
-
-  const speak = document.createElement('button');
-  speak.textContent = 'speak';
-  speak.onclick = () => lipSync.play(voiceUrl).catch((e) => fail(String(e)));
-  hud.appendChild(speak);
-
   const idle = new IdleDirector(stage, {
-    onPlay: (name) => report(`idle ${name}`)
+    onPlay: (name) => console.log('[idle motion]', name)
   });
   (window as any).__idle = idle;
 
-  // with no host configured she simply runs offline, rather than retrying a
-  // socket that was never going to connect
-  if (AVATAR_HOST) {
-    const companion = new Companion(stage, lipSync, {
-      host: AVATAR_HOST,
-      onState: (s) => {
-        log(`avatar-server: ${s}`);
-        report(`ws ${s} (${AVATAR_HOST})`);
-        if (s === 'sleeping' || s === 'awake') idle.setSleeping(s === 'sleeping');
-      },
-      onReply: (text, emotion) => {
-        report(`reply [${emotion}] ${text.slice(0, 80)}`);
-        void captureReaction(model, emotion);
-      }
-    });
-    companion.connect();
-    (window as any).__companion = companion;
+  // Responsive Canvas Sizing
+  function resizeCanvas() {
+    if (!canvasWrapper) return;
+    const rect = canvasWrapper.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  // Mouse Cursor Tracking (Follow eyes/head)
+  if (inTauri()) {
+    onCursor((x, y) => model.lookAt(x, y));
   } else {
-    log('no avatarHost set — offline');
+    window.addEventListener('mousemove', (e) => {
+      const r = canvas.getBoundingClientRect();
+      const x = ((e.clientX - r.left) / r.width) * 2 - 1;
+      const y = -(((e.clientY - r.top) / r.height) * 2 - 1);
+      model.lookAt(x, y);
+    });
+    window.addEventListener('mouseleave', () => model.lookAt(0, 0));
   }
 
-  const probe = { done: false, painted: 0, glError: 0 };
-  (window as any).__spike = probe;
+  // --- MODEL REPOSITIONING (Mouse Drag & Scroll Wheel per Character & Costume) ---
+  setupModelRepositioning(
+    canvasWrapper,
+    () => model,
+    () => currentCharacter.id,
+    () => currentCostume.id
+  );
 
-  // grabbing the canvas has to happen inside the frame for the same reason as
-  // the coverage probe, so expose a request the render loop fulfils
-  let pendingCapture: ((dataUrl: string) => void) | null = null;
-  (window as any).__capture = (w = 320, crop?: [number, number, number, number]) =>
-    new Promise<string>((resolve) => {
-      pendingCapture = (url) => resolve(url);
-      (window as any).__captureOpts = { w, crop };
-    });
+  // Costume Switcher function
+  let isSwitchingCostume = false;
+  const switchCostume = async (costumeId: string): Promise<void> => {
+    const next = currentCharacter.costumes.find((c) => c.id === costumeId);
+    if (!next || isSwitchingCostume || next.id === currentCostume.id) return;
+    isSwitchingCostume = true;
+    showToast(`Switching outfit to ${next.name}...`);
 
-  let last = performance.now();
-  const frame = (now: number) => {
-    const dt = Math.min((now - last) / 1000, 0.1);
-    last = now;
+    const prev = model;
+    try {
+      const at = resolveModel(currentCharacter, next);
+      const fresh = await CompanionModel.load(
+        gl,
+        at.dir,
+        at.file,
+        () => {},
+        currentCharacter.motions ? `${currentCharacter.dir}/${currentCharacter.motions}` : undefined
+      );
+      await fresh.loadMotions();
+
+      // Restore costume-specific position & zoom for this outfit
+      currentCostume = next;
+      localStorage.setItem('costume', next.id);
+      restoreModelTransform(currentCharacter.id, currentCostume.id, fresh);
+      model = fresh;
+      prev.release();
+      enableResize(canvas, model.artAspect);
+      updateCompanionHeader(currentCharacter, currentCostume);
+      populateCostumeSelector(currentCharacter.costumes, currentCostume.id);
+      showToast(`Outfit: ${next.name}`);
+
+      void fetch(`/api/characters/${currentCharacter.id}/costume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ costumeId: next.id })
+      });
+    } catch (e: any) {
+      showToast(`Costume switch failed: ${e.message}`);
+    } finally {
+      isSwitchingCostume = false;
+    }
+  };
+  (window as any).__switchCostume = switchCostume;
+
+  // Character Switcher function
+  const switchCharacter = async (charId: string): Promise<void> => {
+    const nextChar = characters.find((c) => c.id === charId);
+    if (!nextChar || nextChar.id === currentCharacter.id) return;
+
+    showToast(`Loading companion ${nextChar.name}...`);
+    currentCharacter = nextChar;
+    currentCostume = pickCostume(currentCharacter, currentCharacter.activeCostumeId);
+    localStorage.setItem('character', nextChar.id);
+    localStorage.setItem('costume', currentCostume.id);
+
+    const prev = model;
+    try {
+      const at = resolveModel(currentCharacter, currentCostume);
+      const fresh = await CompanionModel.load(
+        gl,
+        at.dir,
+        at.file,
+        () => {},
+        currentCharacter.motions ? `${currentCharacter.dir}/${currentCharacter.motions}` : undefined
+      );
+      await fresh.loadMotions();
+      restoreModelTransform(currentCharacter.id, currentCostume.id, fresh);
+      model = fresh;
+      prev.release();
+      enableResize(canvas, model.artAspect);
+      voiceUrl = `${currentCharacter.dir}/${currentCharacter.voice ?? 'voice'}/greet.wav`;
+
+      updateCompanionHeader(currentCharacter, currentCostume);
+      populateCharacterSelector(characters, currentCharacter.id);
+      populateCostumeSelector(currentCharacter.costumes, currentCostume.id);
+      await loadConversationHistory(currentCharacter.id);
+      showToast(`Switched to ${currentCharacter.name}`);
+    } catch (e: any) {
+      showToast(`Character switch failed: ${e.message}`);
+    }
+  };
+
+  // Expression trigger function
+  const triggerEmotion = (emotion: string) => {
+    const mapped = EMOTION_MAP[emotion.toUpperCase()] ?? EMOTION_MAP.NEUTRAL;
+    if (model.expressions.has(mapped.expression)) {
+      model.setExpression(mapped.expression);
+    }
+    const candidates = model.motionIndex.filter(
+      (m) => !m.loop && mapped.motionPrefixes.some((p) => m.name.startsWith(p))
+    );
+    if (candidates.length) {
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      void model.playMotion(pick.name);
+    }
+  };
+
+  // Render Loop
+  let lastTime = performance.now();
+  const render = (now: number) => {
+    const dt = Math.min((now - lastTime) / 1000, 0.1);
+    lastTime = now;
 
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -275,124 +319,768 @@ async function main() {
     model.update(dt);
     model.draw(gl, canvas.width, canvas.height);
 
-    // coverage has to be sampled inside the frame: without preserveDrawingBuffer
-    // the drawing buffer reads back empty once the frame ends
-    if (!probe.done) {
-      const px = new Uint8Array(4);
-      let painted = 0;
-      for (let x = 1; x < 8; x++)
-        for (let y = 1; y < 8; y++) {
-          gl.readPixels(((canvas.width * x) / 8) | 0, ((canvas.height * y) / 8) | 0,
-                        1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-          if (px[3] > 8) painted++;
-        }
-      probe.painted = painted;
-      probe.glError = gl.getError();
-      probe.done = true;
-    }
-
-    if (pendingCapture) {
-      const { w = 320, crop } = (window as any).__captureOpts ?? {};
-      const [sx, sy, sw, sh] = crop ?? [0, 0, canvas.width, canvas.height];
-      const shot = document.createElement('canvas');
-      shot.width = w;
-      shot.height = Math.round((w * sh) / sw);
-      shot
-        .getContext('2d')!
-        .drawImage(canvas, sx, sy, sw, sh, 0, 0, shot.width, shot.height);
-      const done = pendingCapture;
-      pendingCapture = null;
-      done(shot.toDataURL('image/png'));
-    }
-    requestAnimationFrame(frame);
+    requestAnimationFrame(render);
   };
-  requestAnimationFrame(frame);
+  requestAnimationFrame(render);
 
-  await selfCheck(model, lipSync);
-}
-
-/**
- * Records what she actually did in response to a server reply - mouth movement
- * proves the audio reached the lip sync, and the frame shows the expression.
- */
-async function captureReaction(model: CompanionModel, emotion: string): Promise<void> {
-  const core = model.getModel()._model;
-  const ids: string[] = Array.from(core.parameters.ids);
-  const mouth = ids.indexOf('ParamMouthOpenY');
-  const arm = ids.indexOf('ParamArmR01');
-
-  const mouthSeen: number[] = [];
-  const armSeen: number[] = [];
-  for (let i = 0; i < 110; i++) {
-    await new Promise((r) => requestAnimationFrame(r));
-    if (mouth >= 0) mouthSeen.push(core.parameters.values[mouth]);
-    if (arm >= 0) armSeen.push(core.parameters.values[arm]);
-    if (i === 45) {
-      const grab = (window as any).__capture as (w: number) => Promise<string>;
-      await saveCapture('capture-reaction', await grab(420));
-    }
-  }
-  const range = (s: number[]) =>
-    s.length ? +(Math.max(...s) - Math.min(...s)).toFixed(2) : -1;
-  report(
-    `reaction [${emotion}] mouth=${range(mouthSeen)} arm=${range(armSeen)}`
+  // Setup UI Events & Tabbed Settings
+  setupUI(
+    characters,
+    currentCharacter,
+    switchCharacter,
+    switchCostume,
+    triggerEmotion,
+    lipSync,
+    () => voiceUrl,
+    () => model,
+    () => currentCharacter.id
   );
+
+  // Setup WebSocket Link
+  setupWebSocket(stage, lipSync, switchCostume, triggerEmotion);
+
+  // Load chat history
+  await loadConversationHistory(currentCharacter.id);
 }
 
-/**
- * Exercises look-tracking and lip sync and reports the parameter ranges, so the
- * running app can be verified from the Rust log without a browser attached.
- */
-async function selfCheck(model: CompanionModel, lipSync: LipSync): Promise<void> {
-  const core = model.getModel()._model;
-  const ids: string[] = Array.from(core.parameters.ids);
-  const spread = async (frames: number, watch: string[]) => {
-    const seen: Record<string, number[]> = Object.fromEntries(watch.map((n) => [n, []]));
-    for (let i = 0; i < frames; i++) {
-      await new Promise((r) => requestAnimationFrame(r));
-      for (const n of watch) {
-        const k = ids.indexOf(n);
-        if (k >= 0) seen[n].push(core.parameters.values[k]);
-      }
+// --- Position & Zoom Helpers (Per Character & Costume) ---
+function saveModelTransform(
+  charId: string,
+  costumeId: string | undefined,
+  model: CompanionModel,
+  notify = true
+) {
+  if (!model) return;
+  const transform = {
+    x: +model.offsetX.toFixed(4),
+    y: +model.offsetY.toFixed(4),
+    zoom: +model.zoom.toFixed(3)
+  };
+  if (costumeId) {
+    localStorage.setItem(`l2d_transform_${charId}_${costumeId}`, JSON.stringify(transform));
+  } else {
+    localStorage.setItem(`l2d_transform_${charId}`, JSON.stringify(transform));
+  }
+  if (notify) {
+    showToast('Position saved for this outfit!');
+  }
+}
+
+function restoreModelTransform(
+  charId: string,
+  costumeId: string | undefined,
+  model: CompanionModel
+) {
+  if (!model) return;
+  let raw: string | null = null;
+  if (costumeId) {
+    raw = localStorage.getItem(`l2d_transform_${charId}_${costumeId}`);
+  }
+  if (!raw) {
+    raw = localStorage.getItem(`l2d_transform_${charId}`);
+  }
+  if (raw) {
+    try {
+      const t = JSON.parse(raw);
+      model.setTransform(t.x ?? 0, t.y ?? 0, t.zoom ?? 1.0);
+      if (settingZoomSlider) settingZoomSlider.value = String(t.zoom ?? 1.0);
+      return;
+    } catch {}
+  }
+  model.setTransform(0, 0, 1.0);
+  if (settingZoomSlider) settingZoomSlider.value = '1.0';
+}
+
+function resetModelTransform(
+  charId: string,
+  costumeId: string | undefined,
+  model: CompanionModel
+) {
+  if (!model) return;
+  model.setTransform(0, 0, 1.0);
+  if (costumeId) {
+    localStorage.removeItem(`l2d_transform_${charId}_${costumeId}`);
+  }
+  localStorage.removeItem(`l2d_transform_${charId}`);
+  if (settingZoomSlider) settingZoomSlider.value = '1.0';
+  showToast('Position reset to center');
+}
+
+function setupModelRepositioning(
+  wrapper: HTMLDivElement,
+  getModel: () => CompanionModel,
+  getCharId: () => string,
+  getCostumeId: () => string
+) {
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let initialOffsetX = 0;
+  let initialOffsetY = 0;
+
+  // Drag on Left Click (0), Middle Click (1), or Right Click (2)
+  const onMouseDown = (e: MouseEvent) => {
+    // If clicking on dock buttons, overlay controls, or inputs, do not drag
+    if ((e.target as HTMLElement).closest('.stage-dock, button, select, input')) {
+      return;
     }
-    return Object.fromEntries(
-      Object.entries(seen).map(([n, s]) => [
-        n,
-        s.length ? +(Math.max(...s) - Math.min(...s)).toFixed(2) : -1
-      ])
-    );
+    if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+
+    e.preventDefault();
+    isDragging = true;
+    wrapper.classList.add('dragging');
+    startX = e.clientX;
+    startY = e.clientY;
+    const currentModel = getModel();
+    initialOffsetX = currentModel.offsetX;
+    initialOffsetY = currentModel.offsetY;
   };
 
-  const eyes = ['ParamAngleX', 'ParamEyeBallX', 'ParamMouthOpenY'];
-  model.lookAt(-1, -1);
-  await spread(12, eyes);
-  model.lookAt(1, 1);
-  const looking = await spread(25, eyes);
-  model.lookAt(0, 0);
+  const onMouseMove = (e: MouseEvent) => {
+    if (!isDragging) return;
+    const rect = wrapper.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
 
-  let speaking: Record<string, number> = { ParamMouthOpenY: -1 };
+    // Convert pixel delta directly to Normalized Device Coordinates (NDC: -1 to +1)
+    const dx = ((e.clientX - startX) / rect.width) * 2;
+    const dy = -(((e.clientY - startY) / rect.height) * 2);
+
+    const currentModel = getModel();
+    currentModel.offsetX = initialOffsetX + dx;
+    currentModel.offsetY = initialOffsetY + dy;
+  };
+
+  const onMouseUp = () => {
+    if (isDragging) {
+      isDragging = false;
+      wrapper.classList.remove('dragging');
+      // Auto-save silently for this character & outfit so dragging is never lost
+      saveModelTransform(getCharId(), getCostumeId(), getModel(), false);
+    }
+  };
+
+  wrapper.addEventListener('mousedown', onMouseDown);
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+  window.addEventListener('blur', onMouseUp);
+
+  wrapper.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // Wheel zoom
+  wrapper.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.05 : 1 / 1.05;
+      const currentModel = getModel();
+      currentModel.zoom = Math.max(0.3, Math.min(3.0, +(currentModel.zoom * factor).toFixed(3)));
+      if (settingZoomSlider) settingZoomSlider.value = currentModel.zoom.toFixed(2);
+      saveModelTransform(getCharId(), getCostumeId(), currentModel, false);
+    },
+    { passive: false }
+  );
+
+  // Position control buttons
+  const step = 0.08;
+  btnPanLeft?.addEventListener('click', () => {
+    const m = getModel();
+    m.offsetX -= step;
+    saveModelTransform(getCharId(), getCostumeId(), m, false);
+  });
+  btnPanRight?.addEventListener('click', () => {
+    const m = getModel();
+    m.offsetX += step;
+    saveModelTransform(getCharId(), getCostumeId(), m, false);
+  });
+  btnPanUp?.addEventListener('click', () => {
+    const m = getModel();
+    m.offsetY += step;
+    saveModelTransform(getCharId(), getCostumeId(), m, false);
+  });
+  btnPanDown?.addEventListener('click', () => {
+    const m = getModel();
+    m.offsetY -= step;
+    saveModelTransform(getCharId(), getCostumeId(), m, false);
+  });
+  btnZoomIn?.addEventListener('click', () => {
+    const m = getModel();
+    m.zoom = Math.min(3.0, +(m.zoom + 0.1).toFixed(2));
+    if (settingZoomSlider) settingZoomSlider.value = String(m.zoom);
+    saveModelTransform(getCharId(), getCostumeId(), m, false);
+  });
+  btnZoomOut?.addEventListener('click', () => {
+    const m = getModel();
+    m.zoom = Math.max(0.3, +(m.zoom - 0.1).toFixed(2));
+    if (settingZoomSlider) settingZoomSlider.value = String(m.zoom);
+    saveModelTransform(getCharId(), getCostumeId(), m, false);
+  });
+
+  btnSavePos?.addEventListener('click', () =>
+    saveModelTransform(getCharId(), getCostumeId(), getModel(), true)
+  );
+  btnResetPos?.addEventListener('click', () =>
+    resetModelTransform(getCharId(), getCostumeId(), getModel())
+  );
+  btnModalSavePos?.addEventListener('click', () =>
+    saveModelTransform(getCharId(), getCostumeId(), getModel(), true)
+  );
+  btnModalResetPos?.addEventListener('click', () =>
+    resetModelTransform(getCharId(), getCostumeId(), getModel())
+  );
+
+  settingZoomSlider?.addEventListener('input', () => {
+    const m = getModel();
+    m.zoom = parseFloat(settingZoomSlider.value);
+    saveModelTransform(getCharId(), getCostumeId(), m, false);
+  });
+}
+
+// UI Header Helpers
+function updateCompanionHeader(char: Character, costume: Costume) {
+  if (companionNameEl) companionNameEl.textContent = char.displayName || char.name;
+  if (companionCostumeEl) companionCostumeEl.textContent = costume.name;
+  if (companionInitialEl) companionInitialEl.textContent = (char.name[0] || 'C').toUpperCase();
+}
+
+function populateCharacterSelector(characters: Character[], activeId: string) {
+  if (!selectCharacter) return;
+  selectCharacter.innerHTML = '';
+  for (const c of characters) {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.displayName || c.name;
+    opt.selected = c.id === activeId;
+    selectCharacter.appendChild(opt);
+  }
+}
+
+function populateCostumeSelector(costumes: Costume[], activeId: string) {
+  if (!selectCostume) return;
+  selectCostume.innerHTML = '';
+  for (const c of costumes) {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    opt.selected = c.id === activeId;
+    selectCostume.appendChild(opt);
+  }
+}
+
+// Conversation History & Chat rendering
+let activeConversationId = '';
+
+async function loadConversationHistory(characterId: string) {
+  if (!chatMessagesEl) return;
   try {
-    const dur = await lipSync.play(voiceUrl);
-    speaking = await spread(Math.min(90, Math.ceil(dur * 60)), ['ParamMouthOpenY']);
+    const convRes = await fetch(`/api/conversations?characterId=${encodeURIComponent(characterId)}`);
+    if (!convRes.ok) return;
+    const conv = await convRes.json();
+    activeConversationId = conv.id;
+
+    const msgsRes = await fetch(`/api/conversations/${conv.id}/messages`);
+    if (!msgsRes.ok) return;
+    const msgs = await msgsRes.json();
+
+    chatMessagesEl.innerHTML = '';
+    for (const m of msgs) {
+      appendMessageBubble(m.role, m.content, m.emotion, m.motion, m.audio_url);
+    }
   } catch (e) {
-    report(`lipsync unavailable: ${(e as Error).message}`);
+    console.warn('[history] Failed to load messages:', e);
   }
-
-  report(
-    `selfcheck look ParamAngleX=${looking.ParamAngleX} ParamEyeBallX=${looking.ParamEyeBallX} | ` +
-      `speak ParamMouthOpenY=${speaking.ParamMouthOpenY}`
-  );
-
-  // pull the camera back far enough to show the whole model canvas, so anything
-  // outside the normal framing (legs, feet) becomes visible if it exists
-  const grab = (window as any).__capture as (w: number) => Promise<string>;
-
-  for (const [name, zoom] of [['capture-normal', 1.0], ['capture-wide', 0.42]] as const) {
-    model.zoom = zoom;
-    await new Promise((r) => requestAnimationFrame(r));
-    await saveCapture(name, await grab(560));
-  }
-  model.zoom = 1.0;
 }
 
-main().catch((e) => fail(String(e)));
+function appendMessageBubble(
+  role: 'user' | 'assistant',
+  content: string,
+  emotion?: string,
+  motion?: string,
+  audioUrl?: string
+): HTMLDivElement {
+  const row = document.createElement('div');
+  row.className = `msg-row ${role}`;
+
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta';
+  meta.innerHTML = `<span>${role === 'user' ? 'You' : 'Companion'}</span>`;
+
+  if (emotion && emotion !== 'NEUTRAL') {
+    const pill = document.createElement('span');
+    pill.className = 'tag-pill';
+    pill.textContent = emotion;
+    meta.appendChild(pill);
+  }
+
+  if (motion) {
+    const motionPill = document.createElement('span');
+    motionPill.className = 'tag-pill motion';
+    motionPill.textContent = motion;
+    meta.appendChild(motionPill);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.textContent = content;
+
+  row.appendChild(meta);
+  row.appendChild(bubble);
+
+  if (audioUrl) {
+    const chip = document.createElement('div');
+    chip.className = 'audio-chip';
+    chip.innerHTML = '▶ Listen';
+    chip.onclick = () => {
+      const ls = (window as any).__lipSync as LipSync;
+      if (ls) ls.play(audioUrl).catch(console.error);
+    };
+    bubble.appendChild(document.createElement('br'));
+    bubble.appendChild(chip);
+  }
+
+  chatMessagesEl.appendChild(row);
+  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  return row;
+}
+
+// Main UI Event Binder
+function setupUI(
+  _characters: Character[],
+  getCurrentChar: Character,
+  onSwitchChar: (id: string) => Promise<void>,
+  onSwitchCostume: (id: string) => Promise<void>,
+  onEmotion: (e: string) => void,
+  lipSync: LipSync,
+  getVoiceUrl: () => string,
+  getModel: () => CompanionModel,
+  _getCharId: () => string
+) {
+  let currentChar = getCurrentChar;
+
+  // Dropdown changes
+  selectCharacter?.addEventListener('change', () => {
+    void onSwitchChar(selectCharacter.value);
+  });
+
+  selectCostume?.addEventListener('change', () => {
+    void onSwitchCostume(selectCostume.value);
+  });
+
+  // Sending a chat message
+  const sendMessage = async () => {
+    const text = chatInput.value.trim();
+    if (!text) return;
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+
+    appendMessageBubble('user', text);
+
+    // Placeholder assistant bubble with streaming cursor
+    const pendingRow = document.createElement('div');
+    pendingRow.className = 'msg-row assistant';
+    const pendingMeta = document.createElement('div');
+    pendingMeta.className = 'msg-meta';
+    pendingMeta.innerHTML = '<span>Companion</span><span class="tag-pill">THINKING</span>';
+    const pendingBubble = document.createElement('div');
+    pendingBubble.className = 'msg-bubble';
+    const cursor = document.createElement('span');
+    cursor.className = 'streaming-cursor';
+    pendingBubble.appendChild(cursor);
+    pendingRow.appendChild(pendingMeta);
+    pendingRow.appendChild(pendingBubble);
+    chatMessagesEl.appendChild(pendingRow);
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          characterId: selectCharacter?.value || currentChar.id,
+          message: text,
+          conversationId: activeConversationId
+        })
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let streamedText = '';
+      let receivedAudioUrl = '';
+
+      if (reader) {
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            try {
+              const data = JSON.parse(line.slice(5).trim());
+              if (data.type === 'token') {
+                streamedText += data.token;
+                pendingBubble.textContent = streamedText;
+                pendingBubble.appendChild(cursor);
+                chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+              } else if (data.type === 'audio') {
+                receivedAudioUrl = data.audio_url;
+              } else if (data.type === 'done') {
+                cursor.remove();
+                if (data.message?.audio_url) receivedAudioUrl = data.message.audio_url;
+                if (data.message?.emotion) {
+                  pendingMeta.innerHTML = `<span>Companion</span><span class="tag-pill">${data.message.emotion}</span>`;
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+
+      cursor.remove();
+      if (receivedAudioUrl) {
+        const chip = document.createElement('div');
+        chip.className = 'audio-chip';
+        chip.innerHTML = '▶ Listen';
+        chip.onclick = () => lipSync.play(receivedAudioUrl).catch(console.error);
+        pendingBubble.appendChild(document.createElement('br'));
+        pendingBubble.appendChild(chip);
+      }
+    } catch (e: any) {
+      cursor.remove();
+      pendingBubble.textContent = `(Error: ${e.message || 'Could not reach server'})`;
+    }
+  };
+
+  sendBtn?.addEventListener('click', () => void sendMessage());
+
+  chatInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void sendMessage();
+    }
+  });
+
+  chatInput?.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
+  });
+
+  btnClearChat?.addEventListener('click', async () => {
+    if (!activeConversationId) return;
+    if (confirm('Clear chat history?')) {
+      await fetch(`/api/conversations/${activeConversationId}/messages`, { method: 'DELETE' });
+      chatMessagesEl.innerHTML = '';
+      showToast('Chat history cleared');
+    }
+  });
+
+  // Dock Buttons (Joy, Smile, Sad, Anger, Speak)
+  const dock = document.getElementById('motion-dock');
+  if (dock) {
+    dock.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const exp = target.getAttribute('data-expression');
+      const action = target.getAttribute('data-action');
+      if (exp) {
+        onEmotion(exp);
+        showToast(`Expression: ${exp}`);
+      } else if (action === 'speak-test') {
+        const url = getVoiceUrl();
+        lipSync.play(url).catch((err) => showToast(`Audio error: ${err.message}`));
+      }
+    });
+  }
+
+  // --- SEPARATE TAB NAVIGATION ---
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const targetTab = btn.getAttribute('data-tab');
+      tabButtons.forEach((b) => b.classList.remove('active'));
+      tabContents.forEach((c) => c.classList.remove('active'));
+
+      btn.classList.add('active');
+      const content = document.getElementById(targetTab || '');
+      if (content) content.classList.add('active');
+    });
+  });
+
+  // Temperature display
+  settingTemperature?.addEventListener('input', () => {
+    if (tempDisplay) tempDisplay.textContent = settingTemperature.value;
+  });
+
+  // --- FETCH MODELS FROM API ---
+  btnFetchModels?.addEventListener('click', async () => {
+    btnFetchModels.disabled = true;
+    btnFetchModels.textContent = 'Fetching...';
+    try {
+      const res = await fetch('/api/ai/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: settingProvider.value,
+          baseUrl: settingBaseUrl.value,
+          apiKey: settingApiKey.value
+        })
+      });
+
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.models) && data.models.length > 0) {
+        settingModelSelect.innerHTML = '<option value="">-- Choose Fetched Model --</option>';
+        for (const m of data.models) {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = m;
+          settingModelSelect.appendChild(opt);
+        }
+        settingModelSelect.style.display = 'block';
+        showToast(`Found ${data.models.length} model(s)!`);
+      } else {
+        showToast(`No models found: ${data.error || 'Check endpoint'}`);
+      }
+    } catch (e: any) {
+      showToast(`Fetch models failed: ${e.message}`);
+    } finally {
+      btnFetchModels.disabled = false;
+      btnFetchModels.textContent = '🔄 Fetch Models';
+    }
+  });
+
+  settingModelSelect?.addEventListener('change', () => {
+    if (settingModelSelect.value) {
+      settingModel.value = settingModelSelect.value;
+    }
+  });
+
+  // --- CUSTOM VOICE SAMPLE UPLOAD ---
+  voiceUploadZone?.addEventListener('click', () => voiceFileInput?.click());
+
+  voiceUploadZone?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    voiceUploadZone.style.borderColor = 'var(--primary)';
+  });
+
+  voiceUploadZone?.addEventListener('dragleave', () => {
+    voiceUploadZone.style.borderColor = 'var(--border-active)';
+  });
+
+  voiceUploadZone?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    voiceUploadZone.style.borderColor = 'var(--border-active)';
+    if (e.dataTransfer?.files.length) {
+      handleVoiceUpload(e.dataTransfer.files[0]);
+    }
+  });
+
+  voiceFileInput?.addEventListener('change', () => {
+    if (voiceFileInput.files?.length) {
+      handleVoiceUpload(voiceFileInput.files[0]);
+    }
+  });
+
+  const handleVoiceUpload = (file: File) => {
+    if (!file.name.match(/\.(wav|mp3|ogg|flac|m4a)$/i)) {
+      showToast('Please upload an audio file (.wav, .mp3, etc.)');
+      return;
+    }
+
+    if (uploadStatusText) uploadStatusText.textContent = `Uploading ${file.name}...`;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Data = reader.result as string;
+      try {
+        const res = await fetch('/api/voice/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            characterId: selectCharacter?.value || currentChar.id,
+            filename: file.name,
+            base64Data
+          })
+        });
+
+        const data = await res.json();
+        if (data.ok) {
+          if (uploadStatusText) uploadStatusText.textContent = `✓ Uploaded: ${file.name}`;
+          if (activeVoicePreview) activeVoicePreview.style.display = 'block';
+          if (activeVoiceName) activeVoiceName.textContent = file.name;
+          showToast(`Custom voice sample set: ${file.name}`);
+        } else {
+          if (uploadStatusText) uploadStatusText.textContent = `Upload failed: ${data.error}`;
+        }
+      } catch (err: any) {
+        if (uploadStatusText) uploadStatusText.textContent = `Upload error: ${err.message}`;
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Settings Modal Handlers
+  const openSettings = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      if (res.ok) {
+        const s = await res.json();
+        if (s.ai_provider) settingProvider.value = s.ai_provider;
+        if (s.openai_base_url) settingBaseUrl.value = s.openai_base_url;
+        if (s.openai_api_key) settingApiKey.value = s.openai_api_key;
+        if (s.openai_model) settingModel.value = s.openai_model;
+        if (s.temperature) {
+          settingTemperature.value = s.temperature;
+          if (tempDisplay) tempDisplay.textContent = s.temperature;
+        }
+
+        if (s.tts_master_enabled !== undefined) {
+          settingTtsMaster.checked = s.tts_master_enabled !== 'false';
+        }
+        if (s.tts_engine) settingTtsEngine.value = s.tts_engine;
+        if (s.omnivoice_api_url) settingOmniVoiceUrl.value = s.omnivoice_api_url;
+        if (s.tts_allow_fallback !== undefined) {
+          settingTtsFallback.checked = s.tts_allow_fallback !== 'false';
+        }
+        if (s.edge_voice) settingEdgeVoice.value = s.edge_voice;
+
+        if (s.custom_voice_name && activeVoicePreview && activeVoiceName) {
+          activeVoicePreview.style.display = 'block';
+          activeVoiceName.textContent = s.custom_voice_name;
+        }
+
+        if (s.telegram_bot_enabled !== undefined) {
+          settingTelegramEnabled.checked = s.telegram_bot_enabled === 'true';
+        }
+        if (s.telegram_bot_token) settingTelegramToken.value = s.telegram_bot_token;
+        if (s.telegram_allowed_id) settingTelegramAllowed.value = s.telegram_allowed_id;
+
+        if (s.discord_bot_enabled !== undefined) {
+          settingDiscordEnabled.checked = s.discord_bot_enabled === 'true';
+        }
+        if (s.discord_bot_token) settingDiscordToken.value = s.discord_bot_token;
+        if (s.discord_channel_id) settingDiscordChannel.value = s.discord_channel_id;
+        if (s.discord_allowed_id) settingDiscordAllowed.value = s.discord_allowed_id;
+      }
+    } catch {}
+    if (settingZoomSlider && getModel()) {
+      settingZoomSlider.value = getModel().zoom.toFixed(2);
+    }
+    settingsModal.classList.add('active');
+  };
+
+  btnOpenSettings?.addEventListener('click', openSettings);
+  btnCloseSettings?.addEventListener('click', () => settingsModal.classList.remove('active'));
+  btnCancelSettings?.addEventListener('click', () => settingsModal.classList.remove('active'));
+
+  btnSaveSettings?.addEventListener('click', async () => {
+    const payload = {
+      ai_provider: settingProvider.value,
+      openai_base_url: settingBaseUrl.value,
+      openai_api_key: settingApiKey.value,
+      openai_model: settingModel.value,
+      temperature: settingTemperature.value,
+
+      tts_master_enabled: String(settingTtsMaster.checked),
+      tts_engine: settingTtsEngine.value,
+      omnivoice_api_url: settingOmniVoiceUrl.value,
+      tts_allow_fallback: String(settingTtsFallback.checked),
+      edge_voice: settingEdgeVoice.value,
+
+      telegram_bot_enabled: String(settingTelegramEnabled.checked),
+      telegram_bot_token: settingTelegramToken.value,
+      telegram_allowed_id: settingTelegramAllowed.value,
+
+      discord_bot_enabled: String(settingDiscordEnabled.checked),
+      discord_bot_token: settingDiscordToken.value,
+      discord_channel_id: settingDiscordChannel.value,
+      discord_allowed_id: settingDiscordAllowed.value
+    };
+
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    settingsModal.classList.remove('active');
+    showToast('Settings saved successfully');
+  });
+}
+
+// WebSocket Event Relay
+function setupWebSocket(
+  stage: () => CompanionModel,
+  lipSync: LipSync,
+  switchCostume: (id: string) => Promise<void>,
+  triggerEmotion: (emotion: string) => void
+) {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+  let ws: WebSocket;
+  const connect = () => {
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('[ws] Connected to companion server');
+      showToast('Live link connected', 1500);
+    };
+
+    ws.onmessage = (e) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(e.data);
+      } catch {
+        return;
+      }
+
+      switch (msg.type) {
+        case 'chat':
+          if (msg.emotion) triggerEmotion(msg.emotion);
+          if (msg.audio_url) lipSync.play(msg.audio_url).catch(console.error);
+          break;
+
+        case 'audio_continue':
+          if (msg.audio_url) lipSync.enqueue(msg.audio_url);
+          break;
+
+        case 'chat_emotion':
+          if (msg.emotion) triggerEmotion(msg.emotion);
+          break;
+
+        case 'chat_expression':
+          if (msg.expression && stage().expressions.has(msg.expression)) {
+            stage().setExpression(msg.expression);
+          }
+          break;
+
+        case 'chat_motion':
+          if (msg.motion) void stage().playMotion(msg.motion);
+          break;
+
+        case 'change_costume':
+          if (msg.costume_id) void switchCostume(msg.costume_id);
+          break;
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('[ws] Disconnected. Retrying in 3s...');
+      setTimeout(connect, 3000);
+    };
+
+    ws.onerror = () => ws.close();
+  };
+
+  connect();
+}
+
+main().catch((err) => {
+  console.error('[fatal main]', err);
+  showToast(String(err));
+});

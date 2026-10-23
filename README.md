@@ -1,266 +1,196 @@
-# live2d-companion
+# Unified Multi-Character Live2D AI Companion
 
-A Live2D desktop companion. Transparent, always-on-top, frameless — she sits on
-your desktop, tracks your cursor, idles on her own, and lip-syncs to whatever
-audio you feed her.
+A modern, localhost-first Full-Stack TypeScript application that evolves Live2D Cubism models into an interactive, multi-provider AI companion. Features real-time split-screen chat, live streaming lip-sync, dynamic emotion & motion orchestration, multi-character/outfit management with independent framing, voice cloning, and external Telegram & Discord bot bridges.
 
-**This repo ships no character.** Bring your own Live2D model.
+---
 
-## What it does
+## ✨ Key Features
 
-- Renders any Cubism 4/5 model, with physics, expressions and motions
-- Blinks and breathes procedurally — works even with no motion files at all
-- Tracks the cursor with head, body and eyes
-- Lip sync driven by a live RMS envelope, so it works with streamed TTS
-- Idles between conversations: a looping baseline with occasional ambient motions
-- Optional WebSocket link to a server that sends replies, emotions and audio
-- System tray: show/hide, click-through, quit
-- Scroll to resize, drag to move, `Ctrl+Alt+L` to make her click-through
+### 1. Reversed Split-Screen Web Dashboard
+- **Left Panel (Interactive Chat & Controls ~ 58%)**:
+  - Real-time streaming conversation with inline status pills (`THINKING`, `JOY`, `SAD`, etc.).
+  - Character and outfit switcher with instant live switching.
+  - Persistent chat history backed by local SQLite.
+  - Full-featured Tabbed Settings Modal (`🧠 AI Brain`, `🎙️ Voice & TTS`, `🎭 Live2D Stage`, `🤖 Bot Bridges`).
+- **Right Panel (WebGL Live2D Stage ~ 42%)**:
+  - High-performance Cubism 4 / 5 rendering with procedural breathing, eye blinking, physics, and cursor tracking.
+  - Real-time mouse dragging and scroll-wheel zooming with 1:1 pixel precision.
+  - Independent position and zoom persistence **per character and per costume/outfit**.
+  - On-screen quick docks for expressions, motions, and pan/zoom controls.
 
-## Prerequisites
+### 2. Multi-Character & Outfits Management
+- Auto-detects and synchronizes all characters located in `./Characters/` directly into local SQLite persistence without manual registration.
+- Supports characters with multiple outfits and costumes (e.g. Tokoyami Towa with 4 costumes, Amane Kanata, etc.).
+- Switch costumes seamlessly via the top dropdown, on-screen controls, or through AI commands.
 
-- **Node 20.19+ or 22.12+** — required by Vite 8. An older Node fails at
-  `npm run dev`, which Tauri then reports as
-  `beforeDevCommand ... terminated with a non-zero status code`.
-- **Rust 1.77.2+** — only for the desktop and Android app. Install via
-  [rustup](https://rustup.rs). `npm run dev` runs in a browser and needs no Rust
-  at all, so you can start there while this installs.
+### 3. Multi-Provider AI Brain
+- **OpenAI-Compatible Custom Endpoints**: Connect to local models (LM Studio, Ollama, vLLM, LocalAI) or cloud providers (OpenAI, Groq, OpenRouter, Together AI).
+- **Anthropic Claude**: Official Claude 3.5 Sonnet, Haiku, and Opus support.
+- **Google Gemini**: Gemini 1.5 Flash and Pro support with streaming.
+- **Model Auto-Discovery**: One-click **Fetch Models** button queries the endpoint directly (`GET /models`), eliminating manual model typing.
+- **Streaming Emotion & Action Tag Parser**: Intercepts emotion tags (`[HAPPY]`, `[expression: joy-01]`, `[motion: smile-01]`) in the token stream, cleanly stripping them from the chat bubble while triggering the corresponding Live2D facial expressions and motions.
 
-Tauri also needs a system toolchain, which differs per platform — the
-[Tauri prerequisites page](https://v2.tauri.app/start/prerequisites/) is the
-authority, but in short:
+### 4. TTS (Text-to-Speech) & Real-Time Lip-Sync
+- **OmniVoice Integration**: Voice cloning support via OmniVoice API server.
+- **Custom Voice Sample Upload**: Drag & drop or upload `.wav` / `.mp3` voice samples directly in the UI for instant zero-shot voice cloning.
+- **Edge-TTS Fallback**: Automatic failover to Microsoft Edge neural voices when local TTS server is offline.
+- **Master TTS Toggle**: Turn speech generation on or off at will with zero prompt delay when disabled.
+- **Web Audio Lip-Sync**: Real-time RMS envelope calculation driving `ParamMouthOpenY` and `ParamLipSync` parameters synchronously with audio playback.
 
-| OS | Also needed |
+### 5. External Bot Bridges (Telegram & Discord)
+- **Telegram Bot**: Long-polling bridge allowing you to converse with your companion from mobile or desktop Telegram apps.
+- **Discord Bot**: Direct Discord Gateway v10 WebSocket bridge supporting both Direct Messages (DMs) and server channels (with optional channel ID and user ID whitelisting).
+- Hot-reloaded instantly when saved from the UI without restarting the server.
+
+### 6. Dual-Mode Desktop Pet (Tauri)
+- Run the full Web Dashboard in your browser (`http://localhost:5180`) and simultaneously run the transparent, frameless, always-on-top desktop mascot via `npm run tauri dev`.
+- All client instances sync in real time over local WebSocket (`ws://localhost:8800/ws`).
+
+---
+
+## 📁 Project Architecture
+
+```
+biniL2D-companion/
+├── Characters/                  # Local directory holding your Live2D models & outfits
+│   ├── Amane Kanata/
+│   │   ├── costumes/
+│   │   ├── motions/
+│   │   └── voice/
+│   └── Tokoyami Towa/
+│       ├── costumes/            # Multiple outfits (cmmn-0000, nrml-0022, uniq-0092, etc.)
+│       └── motions/
+├── server/                      # Fastify + Node 26 native SQLite backend
+│   ├── ai/                      # Multi-provider LLM adapters (OpenAI, Claude, Gemini)
+│   ├── bridges/                 # Telegram Bot & Discord Bot Gateway bridges
+│   ├── db/                      # SQLite client, schema & auto-seeding scanner
+│   ├── parser/                  # Streaming tag parser for motions and expressions
+│   ├── routes/                  # REST API routes (assets, characters, chat, settings)
+│   ├── tts/                     # OmniVoice & Edge-TTS speech generation
+│   └── ws/                      # WebSocket hub for multi-client synchronization
+├── src/                         # Frontend client application (TypeScript + Vite)
+│   ├── audio.ts                 # Web Audio API lip-sync engine
+│   ├── idle.ts                  # Procedural idle director
+│   ├── main.ts                  # Split-screen UI, drag repositioning, & event bindings
+│   ├── model.ts                 # Live2D Cubism WebGL model wrapper & projection matrix
+│   ├── pet.ts                   # Tauri desktop pet integration
+│   └── registry.ts              # Dynamic character & costume switcher
+├── src-tauri/                   # Rust desktop application harness (Tauri v2)
+├── index.html                   # Modern split-screen layout & tabbed settings modal
+├── package.json                 # Monorepo scripts & dependencies
+├── vite.config.ts               # Vite dev server with reverse proxies to Fastify
+└── .env.example                 # Configuration template
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+1. **Node.js**: Node 20+ (Node 22 or 26 recommended for native `node:sqlite`).
+2. **Rust & C++ Build Tools** *(Optional)*: Only required if building the desktop pet mode via Tauri (`npm run tauri dev`). Plain Web mode requires Node only.
+
+### Installation
+
+1. **Clone and install dependencies:**
+   ```bash
+   git clone https://github.com/your-username/live2d-companion.git
+   cd live2d-companion
+   npm install
+   ```
+
+2. **Download Live2D Cubism Web Framework:**
+   ```bash
+   npm run setup
+   ```
+   *This downloads the official Cubism Core from Live2D's CDN and sets up the framework in `vendor/` and `public/core/`.*
+
+3. **Start the Unified Development Server:**
+   ```bash
+   npm run dev
+   ```
+   This single command starts:
+   - **Fastify Backend**: Running on `http://localhost:8800`
+   - **Vite Web Dashboard**: Running on `http://localhost:5180`
+
+4. Open `http://localhost:5180` in your browser!
+
+---
+
+## 🎭 Adding Characters and Costumes
+
+Characters are placed inside the `./Characters/` folder at the root of the project.
+
+### Recommended Directory Structure:
+```
+Characters/
+└── <Character Name>/
+    ├── costumes/
+    │   ├── <costume-slug-1>/
+    │   │   ├── <model>.model3.json
+    │   │   ├── <model>.moc3
+    │   │   ├── <model>.physics3.json     (optional)
+    │   │   ├── textures/
+    │   │   └── expressions/              (optional)
+    │   └── <costume-slug-2>/             (optional additional costumes)
+    │       └── <model>.model3.json
+    ├── motions/                          (optional motions shared across costumes)
+    │   ├── idle-01_lv03_lp.motion3.json
+    │   ├── joy-01_lv03.motion3.json
+    │   └── ...
+    └── voice/                            (optional voice samples)
+        └── greet.wav
+```
+
+The server automatically scans `./Characters/` upon launch, extracts all models and costume configurations, and registers them in SQLite.
+
+---
+
+## ⚙️ Configuration & Settings
+
+Settings can be managed directly in the browser via the **⚙️ Settings** button in the top header:
+
+| Tab | Configurable Settings |
 |---|---|
-| Windows | Visual Studio Build Tools with the C++ workload. WebView2 ships with Win10/11 |
-| macOS | `xcode-select --install` |
-| Linux | `webkit2gtk-4.1`, `libxdo`, `libayatana-appindicator3`, `librsvg2` and their `-dev` packages |
+| **🧠 AI Brain** | Provider (`openai`, `claude`, `gemini`), Custom Base URL, API Key, Model selector with **Fetch Models**, Temperature slider. |
+| **🎙️ Voice & TTS** | Master TTS Toggle, TTS Engine (`omnivoice`, `edge-tts`), OmniVoice URL, Edge Voice picker, Custom Voice Sample file upload (`.wav`, `.mp3`). |
+| **🎭 Live2D Stage** | Zoom scale slider, **Save Position for Outfit**, **Reset to Center**. Left-click dragging directly on the stage canvas also saves automatically. |
+| **🤖 Bot Bridges** | Telegram Bot (Enabled, Token, Whitelist ID) and Discord Bot (Enabled, Token, Channel ID, Whitelist ID). |
 
-After installing Rust, **open a new terminal** — the installer edits `PATH`, and
-an already-open shell won't see `cargo` until it restarts.
+You can also preload environment variables using `.env` (see [`.env.example`](file:///.env.example)).
 
-## Setup
+---
 
+## 🤖 External Bot Bridges Setup
+
+### Telegram Bot Bridge
+1. Message [@BotFather](https://t.me/BotFather) on Telegram and create a new bot with `/newbot`.
+2. Copy the bot token into **Settings ➔ Bot Bridges ➔ Telegram Bot Token**.
+3. Toggle **Enable Telegram Bot** and click **Save All Settings**.
+
+### Discord Bot Bridge
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and create an Application.
+2. Under **Bot**, generate a Bot Token and paste it into **Settings ➔ Bot Bridges ➔ Discord Bot Token**.
+3. **Important**: Under the **Bot** page, scroll down to **Privileged Gateway Intents** and enable **MESSAGE CONTENT INTENT**.
+4. Generate an OAuth2 Invite URL with `bot` scope and `Send Messages` / `Read Messages/View Channels` permissions, then invite the bot to your server (or chat in DMs).
+5. Toggle **Enable Discord Bot** and click **Save All Settings**.
+
+---
+
+## 🐾 Desktop Pet Mode (Tauri)
+
+To launch the character as a transparent, always-on-top desktop companion:
 ```bash
-npm install
-npm run setup     # fetches the Cubism runtime (not redistributed here)
-npm run dev       # browser harness at 127.0.0.1:5180 — no Rust needed
-npm run tauri dev # the actual desktop pet — needs Rust
+npm run tauri dev
 ```
+- **Move**: Click and drag the character anywhere on your desktop.
+- **Resize**: Scroll with the mouse wheel over the character.
+- **Click-Through**: Press `Ctrl + Alt + L` to toggle click-through mode.
 
-`npm run setup` downloads the Cubism Core from Live2D's CDN and clones the
-Cubism Web Framework. Using them means accepting
-[Live2D's SDK licence](https://www.live2d.com/en/sdk/license/) — free for
-individuals and businesses under 10M JPY annual revenue, no contract required.
+---
 
-## Adding a character
+## 📜 License & Acknowledgements
 
-Everything under `public/models/` is yours and is never committed.
-
-```
-public/models/
-  index.json              (the registry — see below)
-  my-character/
-    character.json
-    costumes/
-      default/
-        model.model3.json
-        model.moc3
-        textures/texture_00.png
-        expressions/*.exp3.json     (optional)
-        model.physics3.json         (optional)
-    motions/                        (optional)
-      index.json
-      wave.motion3.json
-    voice/greet.wav                 (optional)
-```
-
-`public/models/index.json` — a JSON **array** of directory names. A web build
-can't enumerate a folder, so this file is the registry. One entry per character,
-even if you only have one:
-
-```json
-["my-character"]
-```
-
-`public/models/my-character/character.json`:
-
-```json
-{
-  "id": "my-character",
-  "name": "My Character",
-  "defaultCostume": "default",
-  "costumes": [
-    { "id": "default", "name": "Default", "model": "costumes/default/model.model3.json" }
-  ],
-  "motions": "motions/index.json",
-  "voice": "voice"
-}
-```
-
-`motions/index.json` is a different file — a list of
-`{ name, file, duration, loop }`, inside the character directory. Omit the whole
-`motions` key and she still blinks, breathes and lip-syncs.
-
-Pick which character and costume to show:
-
-```js
-localStorage.setItem('character', 'my-character');
-localStorage.setItem('costume', 'default');
-```
-
-### Model requirements
-
-- **moc3 v5 or older.** The pinned Core rejects v6 (Cubism 5.3 exports).
-- Textures, expressions, physics and motions are all optional and degrade
-  gracefully — a bare `moc3` + texture works.
-
-## Connecting a server
-
-Entirely optional — with no host set she runs offline, idling and blinking on
-her own. To link her to a server, either bake a default into the build:
-
-```bash
-cp .env.example .env.local     # VITE_AVATAR_HOST=192.168.1.10:8800
-```
-
-or set it at runtime, which also repoints an already-shipped build:
-
-```js
-localStorage.setItem('avatarHost', '192.168.1.10:8800');
-```
-
-She expects JSON messages:
-
-| Type | Fields | Effect |
-|---|---|---|
-| `chat` | `reply`, `emotion`, `audio_url` | Expression + motion, speaks the audio |
-| `audio_continue` | `audio_url` | Queued behind the current clip |
-| `sleep` | `sleeping` | Stops speech, switches to sleepy idles |
-
-`emotion` is one of `HAPPY`, `SAD`, `SURPRISED`, `ANGRY`, `THINKING`,
-`NEUTRAL`. The mapping to expressions and motion families lives in
-`src/companion.ts`.
-
-Remote audio is fetched through Rust rather than the webview, so the server
-doesn't need CORS headers.
-
-## Building a release
-
-### Desktop
-
-```bash
-npm run tauri build
-```
-
-Produces an installer under `src-tauri/target/release/bundle/` — `.msi` and
-`.exe` on Windows, `.dmg` on macOS, `.deb`/`.AppImage` on Linux. Models are
-bundled from `public/models/`, so the installer carries whatever character you
-installed. Keep that in mind before handing the file to anyone else.
-
-### Android
-
-The same bundle runs as a normal fullscreen app — no transparency, no tray, no
-cursor tracking, and the pet-mode code paths switch themselves off.
-
-```bash
-npm run tauri android init      # once, generates src-tauri/gen/android/
-npm run tauri android build --  --apk
-```
-
-Two things are worth knowing before the first build:
-
-**Build release, not debug.** A debug APK points the webview at the dev server
-and shows a blank screen on a disconnected phone. Only the release profile
-embeds the frontend into the binary.
-
-**Release APKs must be signed**, or Android refuses to install them. Generate a
-key once:
-
-```bash
-keytool -genkey -v -keystore .keys/companion.keystore \
-  -alias companion -keyalg RSA -keysize 2048 -validity 10000
-```
-
-then write `src-tauri/gen/android/keystore.properties`:
-
-```properties
-password=<your password>
-keyAlias=companion
-storeFile=<absolute path to companion.keystore>
-```
-
-and patch `src-tauri/gen/android/app/build.gradle.kts` — load the properties,
-add a `signingConfigs` block, and reference it from `buildTypes.release`:
-
-```kotlin
-val keystoreProperties = java.util.Properties().apply {
-    val f = rootProject.file("keystore.properties")
-    if (f.exists()) f.inputStream().use { load(it) }
-}
-
-android {
-    signingConfigs {
-        create("release") {
-            if (keystoreProperties.containsKey("storeFile")) {
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["password"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["password"] as String
-            }
-        }
-    }
-    buildTypes {
-        getByName("release") {
-            signingConfig = signingConfigs.getByName("release")
-            // release blocks cleartext by default; a plain-HTTP server on the
-            // local network needs this or the socket fails silently
-            manifestPlaceholders["usesCleartextTraffic"] = "true"
-        }
-    }
-}
-```
-
-`src-tauri/gen/` is gitignored because it is generated — which means
-**re-running `android init` wipes both of these edits**. That's why they're
-written out here rather than committed.
-
-The APK lands at
-`src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk`.
-Verify it before sideloading:
-
-```bash
-apksigner verify --print-certs app-universal-release.apk
-```
-
-The frontend is compiled *into* `lib/arm64-v8a/libapp_lib.so`, not stored as
-loose files, so don't be alarmed that the APK's `assets/` looks empty.
-
-## Troubleshooting
-
-**`failed to run 'cargo metadata' ... program not found`** — Rust isn't
-installed, or your shell hasn't picked it up yet. Install
-[rustup](https://rustup.rs), then open a new terminal. `npm run dev` works
-without it in the meantime.
-
-**`beforeDevCommand ... terminated with a non-zero status code`** — Tauri is
-reporting that `npm run dev` failed; the real error is printed above it. Run
-`npm run dev` on its own to see it. Most often it's Node being too old for
-Vite 8 — check `node -v` against the version above.
-
-**`slugs.map is not a function`** — `public/models/index.json` holds a bare
-string. It must be an array: `["my-character"]`, not `"my-character"`.
-
-**"No characters installed"** — either `public/models/index.json` is missing, or
-a name in it doesn't match a folder beside it. The on-screen log names the
-character it couldn't load.
-
-**Model loads but nothing is drawn** — the moc3 is probably v6, exported from
-Cubism 5.3. The pinned Core supports up to v5; re-export targeting an older
-moc3 version.
-
-## Licence
-
-The code here is mine to license. The Cubism runtime is Live2D's, fetched at
-setup under their terms. Any model you install belongs to whoever made it —
-check its licence before redistributing.
+- **Live2D Cubism Core & Framework**: Copyright (c) Live2D Inc. Subject to [Live2D Open Software License](https://www.live2d.com/en/sdk/license/).
+- **Original Foundation**: Forked and extended from `live2d-companion`.
+- **Application Code**: MIT License.

@@ -1,28 +1,62 @@
+# Dependencies
 node_modules/
-dist/
-.vite/
+.pnp
+.pnp.js
 
-# Local build config — holds your own server address. .env.example is the
-# template that does get committed.
+# Build outputs
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# SQLite Database & Local Data
+data/
+*.db
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# TTS Audio, Generated Speech & Uploaded Voice Samples
+audio/
+cache/
+tmp/
+
+# Live2D Characters & Outfits
+# The engine ships with no models. Place your characters in ./Characters/ (they stay yours)
+Characters/
+public/models/
+
+# Reference Repositories
+_references/
+
+# Environment variables & local secrets
 .env
 .env.local
+.env.*.local
+.keys/
 
-# Cubism runtime — fetched at setup, not ours to redistribute.
-# See README: npm run setup
+# Cubism Web Framework & SDK Runtime (fetched dynamically via `npm run setup`)
 public/core/
 vendor/CubismWebFramework/
 vendor/Core/
 
-# Every installed character. The engine ships with no models; whatever you put
-# here belongs to whoever made it, so it never enters this repo.
-public/models/
-
-# Rust build output
+# Tauri & Rust build artifacts
 src-tauri/target/
 src-tauri/gen/
 
-# Anything rendered from a loaded model — captures, contact sheets, atlas dumps.
-# Those frames are the character's art, so they belong with the model, not here.
-/*.png
+# Logs & Debugging
 *.log
-.keys/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS & Editor generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
