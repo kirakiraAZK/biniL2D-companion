@@ -8,6 +8,7 @@ import { ttsManager } from '../tts/tts-manager';
 import { moodService } from '../services/mood';
 import { weatherService } from '../services/weather';
 import { backgroundService } from '../services/background';
+import { classifyAIError } from '../ai/error-classifier';
 
 export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
   // GET conversations for character
@@ -334,8 +335,9 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
               }
             );
           }
-        } catch (ttsErr) {
+        } catch (ttsErr: any) {
           console.warn('[chat] TTS synthesis error:', ttsErr);
+          wsHub.reportIssue('TTS', 'Voice synthesis failed', ttsErr, 'warn');
         }
       } else {
         // No TTS: broadcast reply without audio
@@ -382,10 +384,19 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
       })}\n\n`);
       reply.raw.end();
     } catch (err: any) {
-      console.error('[chat] LLM streaming error:', err);
-      wsHub.log('AI', `LLM Stream Error: ${err.message}`, { error: String(err) });
-      const fallbackText = "Sorry, I had trouble reaching my AI provider. Please check your API key in Settings.";
-      reply.raw.write(`data: ${JSON.stringify({ type: 'error', error: err.message || fallbackText })}\n\n`);
+      const classified = classifyAIError(err, undefined, character.ai_provider);
+      console.error('[chat] LLM streaming error:', classified.title, err);
+      wsHub.log('AI', classified.title, classified, 'error');
+      reply.raw.write(`data: ${JSON.stringify({
+        type: 'error',
+        error: classified.message,
+        code: classified.code,
+        title: classified.title,
+        hint: classified.hint,
+        provider: classified.provider,
+        retryable: classified.retryable,
+        raw_error: classified.rawError
+      })}\n\n`);
       reply.raw.end();
     }
   });

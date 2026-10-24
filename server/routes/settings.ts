@@ -2,6 +2,8 @@ import { FastifyInstance } from 'fastify';
 import { dbManager } from '../db/client';
 import { telegramBotBridge } from '../bridges/telegram-bot';
 import { discordBotBridge } from '../bridges/discord-bot';
+import { classifyAIError } from '../ai/error-classifier';
+import { wsHub } from '../ws/ws-hub';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -90,6 +92,134 @@ export async function registerSettingsRoutes(app: FastifyInstance): Promise<void
     } catch (e: any) {
       console.warn('[settings] Failed to fetch models:', e.message);
       return reply.status(500).send({ error: `Failed to fetch models: ${e.message}` });
+    }
+  });
+
+  // POST /api/ai/test — Send test ping to verify credentials, model, and network latency
+  app.post('/api/ai/test', async (req, reply) => {
+    const { provider, baseUrl, apiKey, model } = req.body as {
+      provider?: string;
+      baseUrl?: string;
+      apiKey?: string;
+      model?: string;
+    };
+
+    const prov = (provider || dbManager.getSetting('ai_provider') || 'openai').toLowerCase();
+    const isClaude = prov === 'claude' || prov === 'anthropic';
+    const isGemini = prov === 'gemini' || prov === 'google';
+    const keyName = isClaude ? 'anthropic_api_key' : isGemini ? 'gemini_api_key' : 'openai_api_key';
+    const envKey = isClaude ? process.env.ANTHROPIC_API_KEY : isGemini ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY;
+    const key = (apiKey || dbManager.getSetting(keyName) || envKey || '').trim();
+    const rawBase = (baseUrl || dbManager.getSetting('openai_base_url') || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').trim();
+    const targetModel = (model || dbManager.getSetting('openai_model') || (isClaude ? 'claude-3-5-sonnet-20241022' : isGemini ? 'gemini-1.5-flash' : 'gpt-4o-mini')).trim();
+
+    const startTime = Date.now();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      if (isClaude) {
+        if (!key) throw new Error('Anthropic Claude API key is required. Please enter your API key.');
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': key,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: targetModel,
+            max_tokens: 10,
+            messages: [{ role: 'user', content: 'Reply with the word OK.' }]
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          throw new Error(`Claude HTTP ${res.status}: ${body}`);
+        }
+        const data = await res.json() as any;
+        const latencyMs = Date.now() - startTime;
+        return reply.send({
+          ok: true,
+          provider: 'Anthropic Claude',
+          model: targetModel,
+          latencyMs,
+          reply: data.content?.[0]?.text || 'Connected'
+        });
+      }
+
+      if (isGemini) {
+        if (!key) throw new Error('Google Gemini API key is required. Please enter your API key.');
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${encodeURIComponent(key)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: 'Reply with the word OK.' }] }],
+            generationConfig: { maxOutputTokens: 10 }
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          throw new Error(`Gemini HTTP ${res.status}: ${body}`);
+        }
+        const latencyMs = Date.now() - startTime;
+        return reply.send({
+          ok: true,
+          provider: 'Google Gemini',
+          model: targetModel,
+          latencyMs,
+          reply: 'Connected'
+        });
+      }
+
+      // Default: OpenAI or OpenAI-Compatible
+      const endpoint = `${rawBase.replace(/\/+$/, '')}/chat/completions`;
+      const isOfficial = rawBase.includes('api.openai.com');
+      if (isOfficial && !key) {
+        throw new Error('OpenAI API key is required when connecting to api.openai.com.');
+      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (key) headers['Authorization'] = `Bearer ${key}`;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: targetModel,
+          messages: [{ role: 'user', content: 'Reply with the word OK.' }],
+          max_tokens: 10
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`OpenAI HTTP ${res.status}: ${body}`);
+      }
+      const data = await res.json() as any;
+      const latencyMs = Date.now() - startTime;
+      return reply.send({
+        ok: true,
+        provider: 'OpenAI-Compatible',
+        model: targetModel,
+        latencyMs,
+        reply: data.choices?.[0]?.message?.content || 'Connected'
+      });
+    } catch (err: any) {
+      clearTimeout(timer);
+      const classified = classifyAIError(err, undefined, prov);
+      return reply.status(classified.httpStatus || 500).send({
+        ok: false,
+        error: classified.message,
+        title: classified.title,
+        hint: classified.hint,
+        code: classified.code,
+        raw_error: classified.rawError
+      });
     }
   });
 

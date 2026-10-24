@@ -41,11 +41,25 @@ export async function* streamGemini(
     };
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(bodyPayload),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyPayload),
+      signal: controller.signal,
+    });
+  } catch (netErr: any) {
+    clearTimeout(timer);
+    if (netErr?.name === 'AbortError') {
+      throw new Error('Connection timed out after 30s connecting to Google Gemini API');
+    }
+    throw netErr;
+  }
+  clearTimeout(timer);
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');

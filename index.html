@@ -985,6 +985,193 @@
         flex: 1;
         word-break: break-word;
       }
+      .dbg-log-row.error-row {
+        background: rgba(248, 81, 73, 0.12) !important;
+        border-color: rgba(248, 81, 73, 0.45) !important;
+      }
+      .dbg-log-row.warn-row {
+        background: rgba(245, 158, 11, 0.12) !important;
+        border-color: rgba(245, 158, 11, 0.4) !important;
+      }
+
+      /* In-Chat Error Card */
+      .chat-error-card {
+        background: rgba(45, 12, 18, 0.94);
+        border: 1.5px solid #f85149;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin: 4px 0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+        color: #ffc0b8;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+      .chat-error-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+        color: #ff7b72;
+        margin-bottom: 6px;
+      }
+      .chat-error-code {
+        font-size: 10px;
+        padding: 2px 6px;
+        background: rgba(248, 81, 73, 0.25);
+        border-radius: 4px;
+        font-family: monospace;
+        letter-spacing: 0.5px;
+      }
+      .chat-error-body {
+        margin-bottom: 6px;
+        color: #f0f6fc;
+      }
+      .chat-error-hint {
+        font-size: 12px;
+        color: #d2a8ff;
+        background: rgba(163, 113, 247, 0.1);
+        padding: 6px 10px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        border-left: 3px solid #a371f7;
+      }
+      .chat-error-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .chat-error-actions button {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--border-subtle);
+        border-radius: 6px;
+        padding: 5px 12px;
+        font-size: 11.5px;
+        color: #f0f6fc;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .chat-error-actions button:hover {
+        background: rgba(255, 255, 255, 0.18);
+        border-color: var(--primary);
+      }
+      .chat-error-actions .btn-chat-retry {
+        background: rgba(46, 160, 67, 0.2);
+        border-color: rgba(46, 160, 67, 0.5);
+        color: #56d364;
+        font-weight: 600;
+      }
+      .chat-error-actions .btn-chat-retry:hover {
+        background: rgba(46, 160, 67, 0.35);
+      }
+
+      /* === TOP-LAYER NOTIFICATION & ERROR ANNOUNCEMENT LAYER (Always on Top) === */
+      #app-notification-layer {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 999999 !important;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: none;
+        max-width: 92vw;
+        width: 520px;
+      }
+      .app-notice-item {
+        pointer-events: auto;
+        border-radius: 12px;
+        padding: 12px 16px;
+        box-shadow: 0 10px 32px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.12);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        animation: slideDownFade 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        backdrop-filter: blur(20px);
+        font-family: inherit;
+        transition: opacity 0.25s, transform 0.25s;
+      }
+      .app-notice-item.error {
+        background: rgba(38, 12, 16, 0.96);
+        border: 1.5px solid #f85149;
+        color: #ffc0b8;
+      }
+      .app-notice-item.warn {
+        background: rgba(38, 25, 8, 0.96);
+        border: 1.5px solid #d29922;
+        color: #f8e3a1;
+      }
+      .app-notice-item.info {
+        background: rgba(14, 24, 44, 0.96);
+        border: 1.5px solid #58a6ff;
+        color: #c9d1d9;
+      }
+      .app-notice-item.success {
+        background: rgba(12, 34, 20, 0.96);
+        border: 1.5px solid #3fb950;
+        color: #7ee787;
+      }
+      .app-notice-icon {
+        font-size: 20px;
+        flex-shrink: 0;
+        line-height: 1.2;
+      }
+      .app-notice-content {
+        flex: 1;
+        min-width: 0;
+      }
+      .app-notice-title {
+        font-weight: 700;
+        font-size: 13.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #fff;
+        margin-bottom: 3px;
+      }
+      .app-notice-desc {
+        font-size: 12px;
+        line-height: 1.45;
+        color: inherit;
+        opacity: 0.95;
+        word-break: break-word;
+      }
+      .app-notice-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .app-notice-btn {
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        padding: 4px 11px;
+        font-size: 11.5px;
+        color: #fff;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .app-notice-btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+      }
+      .app-notice-close {
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 16px;
+        cursor: pointer;
+        padding: 0 4px;
+        flex-shrink: 0;
+        line-height: 1;
+        transition: color 0.15s;
+      }
+      .app-notice-close:hover {
+        color: #fff;
+      }
+      @keyframes slideDownFade {
+        from { opacity: 0; transform: translateY(-14px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
 
       .tag-pill.raw-btn {
         background: rgba(14, 165, 233, 0.15);
@@ -1175,7 +1362,10 @@
           </div>
           <div class="header-actions">
             <button class="icon-btn" id="btn-toggle-raw-chat" title="Toggle Raw AI Output in Chat">👁️</button>
-            <button class="icon-btn" id="btn-toggle-debug" title="Developer Debug Console (View Raw AI Output & Logs)">🐞</button>
+            <button class="icon-btn" id="btn-toggle-debug" title="Developer Debug Console (View Raw AI Output & Logs)" style="position: relative;">
+              🐞
+              <span id="dbg-error-badge" style="display: none; position: absolute; top: -4px; right: -4px; background: #f85149; color: #fff; font-size: 9.5px; font-weight: 700; border-radius: 10px; padding: 1px 4.5px; line-height: 1.2; box-shadow: 0 0 6px rgba(248,81,73,0.6);">0</span>
+            </button>
             <button class="icon-btn" id="btn-clear-chat" title="Clear Chat History">🗑️</button>
             <button class="icon-btn" id="btn-open-settings" title="Settings">⚙️</button>
           </div>
@@ -1310,11 +1500,15 @@
                 <button type="button" class="btn-secondary" id="btn-fetch-models" title="Fetch model names automatically from API">
                   🔄 Fetch Models
                 </button>
+                <button type="button" class="btn-secondary" id="btn-test-ai-connection" title="Send a test ping to verify your API key and model" style="background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.45); color: #c7d2fe;">
+                  ⚡ Test Ping
+                </button>
               </div>
               <!-- Populated dropdown after fetching -->
               <select id="setting-model-select" style="display: none; margin-top: 6px;">
                 <option value="">Select fetched model...</option>
               </select>
+              <div id="model-fetch-status" style="display:none; margin-top:6px; font-size:12px; line-height:1.4; padding:6px 10px; border-radius:6px; word-break:break-word;"></div>
             </div>
 
             <div class="settings-group">
@@ -1794,6 +1988,7 @@
                 <button class="dbg-filter-btn" data-cat="WS">WebSocket</button>
                 <button class="dbg-filter-btn" data-cat="MOOD">Mood</button>
                 <button class="dbg-filter-btn" data-cat="INTERACTION">Interaction</button>
+                <button class="dbg-filter-btn" data-cat="ERRORS" style="color: #ff7b72; border-color: rgba(248, 81, 73, 0.45);">⚠️ Errors</button>
               </div>
               <div style="margin-left: auto; display: flex; gap: 6px;">
                 <button class="dock-pill" id="btn-clear-dbg-logs">🗑️ Clear</button>
@@ -1818,6 +2013,9 @@
         </div>
       </div>
     </div>
+
+    <!-- GLOBAL TOP-LAYER ERROR & SYSTEM NOTICE CONTAINER -->
+    <div id="app-notification-layer"></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

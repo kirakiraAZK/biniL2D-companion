@@ -9,6 +9,7 @@ export interface DebugLogEntry {
   id: string;
   timestamp: number;
   category: 'AI' | 'WS' | 'TTS' | 'INTERACTION' | 'MOOD' | 'SYSTEM';
+  level: 'info' | 'warn' | 'error';
   title: string;
   data?: any;
 }
@@ -16,7 +17,7 @@ export interface DebugLogEntry {
 class WebSocketHub {
   private clients = new Set<WebSocket>();
   private logRing: DebugLogEntry[] = [];
-  private readonly MAX_LOGS = 200;
+  private readonly MAX_LOGS = 250;
 
   addClient(ws: WebSocket): void {
     this.clients.add(ws);
@@ -51,11 +52,17 @@ class WebSocketHub {
     });
   }
 
-  log(category: DebugLogEntry['category'], title: string, data?: any): void {
+  log(
+    category: DebugLogEntry['category'],
+    title: string,
+    data?: any,
+    level: 'info' | 'warn' | 'error' = 'info'
+  ): void {
     const entry: DebugLogEntry = {
       id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       timestamp: Date.now(),
       category,
+      level,
       title,
       data
     };
@@ -72,6 +79,36 @@ class WebSocketHub {
         client.send(payload);
       }
     }
+
+    // Proactively announce warnings and errors directly to the user interface
+    if (level === 'error' || level === 'warn') {
+      const summary = typeof data === 'string'
+        ? data
+        : data?.message || data?.error || data?.hint || '';
+      const noticePayload = JSON.stringify({
+        type: 'system_notice',
+        level,
+        category,
+        title,
+        message: summary
+      });
+      for (const client of this.clients) {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(noticePayload);
+        }
+      }
+    }
+  }
+
+  reportIssue(
+    category: DebugLogEntry['category'],
+    title: string,
+    err: any,
+    level: 'warn' | 'error' = 'error'
+  ): void {
+    const message = err?.message || String(err || 'Unknown error');
+    console[level === 'error' ? 'error' : 'warn'](`[${category}] ${title}:`, message);
+    this.log(category, title, { error: message, stack: err?.stack }, level);
   }
 
   getRecentLogs(limit = 100): DebugLogEntry[] {

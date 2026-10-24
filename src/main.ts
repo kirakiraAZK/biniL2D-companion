@@ -38,10 +38,13 @@ const settingsModal = document.getElementById('settings-modal') as HTMLDivElemen
 // Settings Inputs
 const settingProvider = document.getElementById('setting-provider') as HTMLSelectElement;
 const settingBaseUrl = document.getElementById('setting-base-url') as HTMLInputElement;
+const groupBaseUrl = document.getElementById('group-base-url') as HTMLDivElement;
 const settingApiKey = document.getElementById('setting-api-key') as HTMLInputElement;
 const settingModel = document.getElementById('setting-model') as HTMLInputElement;
 const settingModelSelect = document.getElementById('setting-model-select') as HTMLSelectElement;
 const btnFetchModels = document.getElementById('btn-fetch-models') as HTMLButtonElement;
+const btnTestAiConnection = document.getElementById('btn-test-ai-connection') as HTMLButtonElement;
+const modelFetchStatus = document.getElementById('model-fetch-status') as HTMLDivElement;
 const settingTemperature = document.getElementById('setting-temperature') as HTMLInputElement;
 const tempDisplay = document.getElementById('temp-display') as HTMLElement;
 
@@ -128,6 +131,160 @@ const settingNotionApiKey = document.getElementById('setting-notion-api-key') as
 const settingGoogleEnabled = document.getElementById('setting-google-enabled') as HTMLInputElement;
 const settingNextcloudEnabled = document.getElementById('setting-nextcloud-enabled') as HTMLInputElement;
 const settingDebugMode = document.getElementById('setting-debug-mode') as HTMLInputElement;
+const appNotificationLayer = document.getElementById('app-notification-layer');
+
+function escapeHtml(str: any): string {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Global Top-Layer System Announcement / Error Banner (Always on Top)
+function showTopNotice(
+  level: 'error' | 'warn' | 'info' | 'success',
+  title: string,
+  message: string,
+  options: { duration?: number; hint?: string; actionLabel?: string; onAction?: () => void } = {}
+) {
+  if (!appNotificationLayer) return;
+  const item = document.createElement('div');
+  item.className = `app-notice-item ${level}`;
+
+  const iconMap: Record<string, string> = {
+    error: '❌',
+    warn: '⚠️',
+    info: 'ℹ️',
+    success: '✅'
+  };
+
+  const iconEl = document.createElement('div');
+  iconEl.className = 'app-notice-icon';
+  iconEl.textContent = iconMap[level] || 'ℹ️';
+
+  const contentEl = document.createElement('div');
+  contentEl.className = 'app-notice-content';
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'app-notice-title';
+  titleEl.textContent = title;
+
+  const descEl = document.createElement('div');
+  descEl.className = 'app-notice-desc';
+  descEl.textContent = message + (options.hint ? ` (${options.hint})` : '');
+
+  contentEl.appendChild(titleEl);
+  contentEl.appendChild(descEl);
+
+  const dismiss = () => {
+    item.style.opacity = '0';
+    item.style.transform = 'translateY(-12px)';
+    setTimeout(() => item.remove(), 250);
+  };
+
+  if (options.actionLabel && options.onAction) {
+    const actionsEl = document.createElement('div');
+    actionsEl.className = 'app-notice-actions';
+    const actionBtn = document.createElement('button');
+    actionBtn.className = 'app-notice-btn';
+    actionBtn.textContent = options.actionLabel;
+    actionBtn.onclick = () => {
+      options.onAction!();
+      dismiss();
+    };
+    actionsEl.appendChild(actionBtn);
+    contentEl.appendChild(actionsEl);
+  }
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'app-notice-close';
+  closeBtn.innerHTML = '✕';
+  closeBtn.title = 'Dismiss';
+  closeBtn.onclick = dismiss;
+
+  item.appendChild(iconEl);
+  item.appendChild(contentEl);
+  item.appendChild(closeBtn);
+
+  appNotificationLayer.appendChild(item);
+
+  const duration = options.duration !== undefined ? options.duration : level === 'error' ? 14000 : 7000;
+  if (duration > 0) {
+    setTimeout(() => {
+      if (item.isConnected) dismiss();
+    }, duration);
+  }
+}
+
+// In-Chat Error Card Component
+function renderChatErrorCard(
+  bubble: HTMLElement,
+  err: { title?: string; code?: string; message?: string; error?: string; hint?: string; retryable?: boolean; raw_error?: any },
+  userText: string,
+  onRetry?: () => void
+) {
+  bubble.innerHTML = '';
+  const card = document.createElement('div');
+  card.className = 'chat-error-card';
+
+  const header = document.createElement('div');
+  header.className = 'chat-error-header';
+  header.innerHTML = `<span>⚠️ ${escapeHtml(err.title || 'AI Model Error')}</span>`;
+  if (err.code) {
+    const codeTag = document.createElement('span');
+    codeTag.className = 'chat-error-code';
+    codeTag.textContent = err.code;
+    header.appendChild(codeTag);
+  }
+  card.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'chat-error-body';
+  body.textContent = err.message || err.error || 'The model provider returned an error.';
+  card.appendChild(body);
+
+  if (err.hint) {
+    const hint = document.createElement('div');
+    hint.className = 'chat-error-hint';
+    hint.innerHTML = `💡 <strong>Hint:</strong> ${escapeHtml(err.hint)}`;
+    card.appendChild(hint);
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'chat-error-actions';
+
+  if (err.retryable !== false && onRetry) {
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'btn-chat-retry';
+    retryBtn.innerHTML = '🔄 Retry';
+    retryBtn.onclick = () => onRetry();
+    actions.appendChild(retryBtn);
+  }
+
+  const settingsBtn = document.createElement('button');
+  settingsBtn.className = 'btn-chat-settings';
+  settingsBtn.innerHTML = '⚙️ AI Brain Settings';
+  settingsBtn.onclick = () => {
+    document.getElementById('btn-open-settings')?.click();
+    document.querySelector<HTMLButtonElement>('[data-tab="tab-ai"]')?.click();
+  };
+  actions.appendChild(settingsBtn);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.innerHTML = '📋 Copy Error';
+  copyBtn.onclick = () => {
+    const copyText = JSON.stringify(err, null, 2);
+    void navigator.clipboard.writeText(copyText);
+    copyBtn.textContent = '✓ Copied';
+    setTimeout(() => { copyBtn.textContent = '📋 Copy Error'; }, 2000);
+  };
+  actions.appendChild(copyBtn);
+
+  card.appendChild(actions);
+  bubble.appendChild(card);
+}
 
 // Toast Helper
 function showToast(msg: string, duration = 2800) {
@@ -1023,7 +1180,37 @@ function setupUI(
         })
       });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        let errData: any = {};
+        try {
+          errData = await res.json();
+        } catch {
+          errData = { error: `Server error: HTTP ${res.status}` };
+        }
+        cursor.remove();
+        const classified = {
+          title: errData.title || 'AI Request Failed',
+          code: errData.code || `HTTP_${res.status}`,
+          message: errData.error || errData.message || `Server returned HTTP ${res.status}`,
+          hint: errData.hint || 'Check your AI brain settings and credentials.',
+          provider: errData.provider,
+          retryable: errData.retryable !== false
+        };
+        debugManager.log('AI', classified.title, classified, undefined, 'error');
+        showTopNotice('error', classified.title, classified.message, {
+          hint: classified.hint,
+          actionLabel: 'Settings',
+          onAction: () => {
+            document.getElementById('btn-open-settings')?.click();
+            document.querySelector<HTMLButtonElement>('[data-tab="tab-ai"]')?.click();
+          }
+        });
+        renderChatErrorCard(pendingBubble, classified, text, () => {
+          chatInput.value = text;
+          void sendMessage();
+        });
+        return;
+      }
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -1031,6 +1218,7 @@ function setupUI(
       let receivedAudioUrl = '';
       let receivedThought = '';
       let doneData: any = null;
+      let isError = false;
 
       if (reader) {
         let buffer = '';
@@ -1054,6 +1242,23 @@ function setupUI(
                 receivedThought += data.thought;
               } else if (data.type === 'audio') {
                 receivedAudioUrl = data.audio_url;
+              } else if (data.type === 'error') {
+                isError = true;
+                cursor.remove();
+                debugManager.log('AI', data.title || 'AI Error', data, undefined, 'error');
+                showTopNotice('error', data.title || 'AI Model Error', data.error || data.message || 'Stream error', {
+                  hint: data.hint,
+                  actionLabel: 'AI Settings',
+                  onAction: () => {
+                    document.getElementById('btn-open-settings')?.click();
+                    document.querySelector<HTMLButtonElement>('[data-tab="tab-ai"]')?.click();
+                  }
+                });
+                renderChatErrorCard(pendingBubble, data, text, () => {
+                  chatInput.value = text;
+                  void sendMessage();
+                });
+                break;
               } else if (data.type === 'done') {
                 doneData = data;
                 cursor.remove();
@@ -1084,14 +1289,17 @@ function setupUI(
                 }
                 if (data.message?.costume) {
                   metaHtml += `<span class="tag-pill costume">👔 ${data.message.costume}</span>`;
-                  void switchCostume(data.message.costume);
+                  void onSwitchCostume(data.message.costume);
                 }
                 pendingMeta.innerHTML = metaHtml;
               }
             } catch {}
           }
+          if (isError) break;
         }
       }
+
+      if (isError) return;
 
       cursor.remove();
       pendingBubble.innerHTML = '';
@@ -1134,7 +1342,19 @@ function setupUI(
       }
     } catch (e: any) {
       cursor.remove();
-      pendingBubble.textContent = `(Error: ${e.message || 'Could not reach server'})`;
+      const errObj = {
+        title: 'Network / Communication Error',
+        code: 'NETWORK_ERROR',
+        message: e.message || 'Failed to reach companion server',
+        hint: 'Verify the server is running on localhost.',
+        retryable: true
+      };
+      debugManager.log('AI', errObj.title, errObj, undefined, 'error');
+      showTopNotice('error', errObj.title, errObj.message, { hint: errObj.hint });
+      renderChatErrorCard(pendingBubble, errObj, text, () => {
+        chatInput.value = text;
+        void sendMessage();
+      });
     }
   };
 
@@ -1287,10 +1507,27 @@ function setupUI(
     if (tempDisplay) tempDisplay.textContent = settingTemperature.value;
   });
 
+  // Auto-hide Custom Base URL if AI Provider is NOT OpenAI compatible
+  const updateBaseUrlVisibility = () => {
+    if (groupBaseUrl) {
+      const isCustomEndpoint = settingProvider.value === 'openai';
+      groupBaseUrl.style.display = isCustomEndpoint ? 'block' : 'none';
+    }
+  };
+  settingProvider?.addEventListener('change', updateBaseUrlVisibility);
+
   // --- FETCH MODELS FROM API ---
   btnFetchModels?.addEventListener('click', async () => {
     btnFetchModels.disabled = true;
-    btnFetchModels.textContent = 'Fetching...';
+    btnFetchModels.textContent = '⏳ Fetching...';
+    if (modelFetchStatus) {
+      modelFetchStatus.style.display = 'block';
+      modelFetchStatus.style.background = 'rgba(99, 102, 241, 0.15)';
+      modelFetchStatus.style.border = '1px solid rgba(99, 102, 241, 0.3)';
+      modelFetchStatus.style.color = '#c7d2fe';
+      modelFetchStatus.textContent = `Connecting to ${settingProvider.value} to discover available models...`;
+    }
+
     try {
       const res = await fetch('/api/ai/models', {
         method: 'POST',
@@ -1312,15 +1549,97 @@ function setupUI(
           settingModelSelect.appendChild(opt);
         }
         settingModelSelect.style.display = 'block';
+        if (modelFetchStatus) {
+          modelFetchStatus.style.background = 'rgba(16, 185, 129, 0.15)';
+          modelFetchStatus.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+          modelFetchStatus.style.color = '#6ee7b7';
+          modelFetchStatus.innerHTML = `✓ <strong>Discovered ${data.models.length} model(s)</strong>! Pick one below or type manually.`;
+        }
         showToast(`Found ${data.models.length} model(s)!`);
+        debugManager.log('AI', `Fetched ${data.models.length} models for ${settingProvider.value}`);
       } else {
-        showToast(`No models found: ${data.error || 'Check endpoint'}`);
+        const errMsg = data.error || 'Endpoint returned no models or invalid response format.';
+        if (modelFetchStatus) {
+          modelFetchStatus.style.background = 'rgba(248, 81, 73, 0.15)';
+          modelFetchStatus.style.border = '1px solid rgba(248, 81, 73, 0.45)';
+          modelFetchStatus.style.color = '#ffc0b8';
+          modelFetchStatus.innerHTML = `⚠️ <strong>Fetch Failed:</strong> ${escapeHtml(errMsg)}<br><span style="font-size:11.5px; color:#d2a8ff;">Check your API key/endpoint, or type the model name manually.</span>`;
+        }
+        showTopNotice('warn', 'Model Fetch Incomplete', errMsg);
+        debugManager.log('AI', 'Model Fetch Failed', data, undefined, 'warn');
       }
     } catch (e: any) {
-      showToast(`Fetch models failed: ${e.message}`);
+      if (modelFetchStatus) {
+        modelFetchStatus.style.background = 'rgba(248, 81, 73, 0.15)';
+        modelFetchStatus.style.border = '1px solid rgba(248, 81, 73, 0.45)';
+        modelFetchStatus.style.color = '#ffc0b8';
+        modelFetchStatus.textContent = `Network Error: ${e.message}`;
+      }
+      showTopNotice('error', 'Model Fetch Error', e.message);
     } finally {
       btnFetchModels.disabled = false;
       btnFetchModels.textContent = '🔄 Fetch Models';
+    }
+  });
+
+  // --- DIRECT AI CONNECTION TEST (PING) ---
+  btnTestAiConnection?.addEventListener('click', async () => {
+    btnTestAiConnection.disabled = true;
+    btnTestAiConnection.textContent = '⚡ Testing...';
+    if (modelFetchStatus) {
+      modelFetchStatus.style.display = 'block';
+      modelFetchStatus.style.background = 'rgba(99, 102, 241, 0.15)';
+      modelFetchStatus.style.border = '1px solid rgba(99, 102, 241, 0.3)';
+      modelFetchStatus.style.color = '#c7d2fe';
+      modelFetchStatus.textContent = `Sending test ping to ${settingProvider.value}...`;
+    }
+
+    try {
+      const res = await fetch('/api/ai/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: settingProvider.value,
+          baseUrl: settingBaseUrl.value,
+          apiKey: settingApiKey.value,
+          model: settingModel.value
+        })
+      });
+
+      const data = await res.json();
+      if (data.ok) {
+        if (modelFetchStatus) {
+          modelFetchStatus.style.background = 'rgba(16, 185, 129, 0.15)';
+          modelFetchStatus.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+          modelFetchStatus.style.color = '#6ee7b7';
+          modelFetchStatus.innerHTML = `✓ <strong>Connected!</strong> Latency: <strong>${data.latency_ms}ms</strong> | Provider: <code>${data.provider}</code> | Model: <code>${data.model}</code><br><span style="font-size:11.5px; opacity:0.88;">Sample Reply: "${escapeHtml(data.preview)}"</span>`;
+        }
+        showTopNotice('success', 'AI Ping Succeeded', `Connected to ${data.provider} (${data.latency_ms}ms)`);
+        debugManager.log('AI', `AI Ping Success (${data.latency_ms}ms)`, data);
+      } else {
+        const classified = data.classified || {};
+        const title = classified.title || 'AI Connection Failed';
+        const msg = classified.message || data.error || 'Connection check failed';
+        if (modelFetchStatus) {
+          modelFetchStatus.style.background = 'rgba(248, 81, 73, 0.15)';
+          modelFetchStatus.style.border = '1px solid rgba(248, 81, 73, 0.45)';
+          modelFetchStatus.style.color = '#ffc0b8';
+          modelFetchStatus.innerHTML = `⚠️ <strong>${escapeHtml(title)}</strong> [${escapeHtml(classified.code || 'ERR')}]: ${escapeHtml(msg)}<br>${classified.hint ? `<span style="font-size:11.5px; color:#d2a8ff;">💡 Hint: ${escapeHtml(classified.hint)}</span>` : ''}`;
+        }
+        showTopNotice('error', title, msg, { hint: classified.hint });
+        debugManager.log('AI', title, data, undefined, 'error');
+      }
+    } catch (e: any) {
+      if (modelFetchStatus) {
+        modelFetchStatus.style.background = 'rgba(248, 81, 73, 0.15)';
+        modelFetchStatus.style.border = '1px solid rgba(248, 81, 73, 0.45)';
+        modelFetchStatus.style.color = '#ffc0b8';
+        modelFetchStatus.textContent = `Network Error: ${e.message}`;
+      }
+      showTopNotice('error', 'Ping Network Error', e.message);
+    } finally {
+      btnTestAiConnection.disabled = false;
+      btnTestAiConnection.textContent = '⚡ Test Ping';
     }
   });
 
@@ -1434,6 +1753,8 @@ function setupUI(
         settingTemperature.value = String(temp);
         if (tempDisplay) tempDisplay.textContent = String(temp);
       }
+      updateBaseUrlVisibility();
+      if (modelFetchStatus) modelFetchStatus.style.display = 'none';
 
       // Voice & TTS tab (per-character preference with global fallback)
       if (settingTtsMaster) {
@@ -1718,11 +2039,16 @@ function setupUI(
     };
 
     try {
-      await fetch(`/api/characters/${encodeURIComponent(cur.id)}`, {
+      const charRes = await fetch(`/api/characters/${encodeURIComponent(cur.id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(charUpdatePayload)
       });
+      if (!charRes.ok) {
+        const errJson = await charRes.json().catch(() => ({}));
+        throw new Error(errJson.error || `Character save failed with HTTP ${charRes.status}`);
+      }
+
       cur.displayName = charUpdatePayload.display_name;
       cur.name = charUpdatePayload.display_name;
       (cur as any).ai_provider = charUpdatePayload.ai_provider;
@@ -1733,17 +2059,25 @@ function setupUI(
       (cur as any).tts_voice = charUpdatePayload.tts_voice;
       updateCompanionHeader(cur, getCurrentCostume());
       populateCharacterSelector(characters, cur.id);
-    } catch (e: any) {
-      console.warn('[settings] Failed to save character profile:', e);
-    }
 
-    await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    settingsModal.classList.remove('active');
-    showToast(`Settings saved for ${cur.displayName || cur.name}`);
+      const settingsRes = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!settingsRes.ok) {
+        const errJson = await settingsRes.json().catch(() => ({}));
+        throw new Error(errJson.error || `Global settings save failed with HTTP ${settingsRes.status}`);
+      }
+
+      settingsModal.classList.remove('active');
+      showToast(`Settings saved for ${cur.displayName || cur.name}`);
+      showTopNotice('success', 'Settings Saved', `Successfully updated preferences for ${cur.displayName || cur.name}`, { duration: 3500 });
+      debugManager.log('SYSTEM', `Settings saved for ${cur.displayName || cur.name}`);
+    } catch (e: any) {
+      showTopNotice('error', 'Settings Save Failed', e.message);
+      debugManager.log('SYSTEM', 'Settings Save Failed', { error: e.message }, undefined, 'error');
+    }
   });
 }
 
@@ -1778,12 +2112,36 @@ function setupWebSocket(
       }
 
       if (msg.type === 'debug_log' && msg.log) {
-        debugManager.log(msg.log.category, msg.log.title, msg.log.data, msg.log.timestamp);
+        debugManager.log(msg.log.category, msg.log.title, msg.log.data, msg.log.timestamp, msg.log.level);
       } else if (msg.type !== 'stream_token') {
         debugManager.log('WS', `Event: ${msg.type}`, msg);
       }
 
       switch (msg.type) {
+        case 'system_notice':
+          if (msg.level === 'error') {
+            showTopNotice('error', msg.title || 'System Error', msg.message || 'An error occurred', {
+              hint: msg.hint,
+              actionLabel: 'View Debug',
+              onAction: () => {
+                debugManager.open();
+                document.querySelector<HTMLButtonElement>('[data-dbg-tab="dbg-tab-logs"]')?.click();
+              }
+            });
+          } else if (msg.level === 'warn') {
+            showTopNotice('warn', msg.title || 'System Notice', msg.message || 'Warning notice', {
+              hint: msg.hint,
+              actionLabel: 'View Debug',
+              onAction: () => {
+                debugManager.open();
+                document.querySelector<HTMLButtonElement>('[data-dbg-tab="dbg-tab-logs"]')?.click();
+              }
+            });
+          } else {
+            showTopNotice('info', msg.title || 'System Notice', msg.message || 'Information');
+          }
+          break;
+
         case 'chat':
           if (msg.emotion) triggerEmotion(msg.emotion);
           if (msg.motion) void stage().playMotion(msg.motion);
