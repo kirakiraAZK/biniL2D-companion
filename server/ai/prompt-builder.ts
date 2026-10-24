@@ -7,9 +7,15 @@ export interface PromptMessage {
   content: string;
 }
 
+export interface SystemPromptOptions {
+  lastMessageTime?: number;
+  weatherContext?: string | null;
+  connectorContext?: string | null;
+}
+
 export function buildSystemPrompt(
   character: CharacterRow,
-  options?: { lastMessageTime?: number }
+  options?: SystemPromptOptions
 ): string {
   const costumes = dbManager.getCostumesForCharacter(character.id);
   const costumeListStr = costumes.map(c => `"${c.name}" (slug: ${c.costume_slug})`).join(', ');
@@ -114,7 +120,10 @@ export function buildSystemPrompt(
     .replace(/\{\{OWNER_PRONOUN\}\}/g, ownerPronoun)
     .replace(/\{\{LANGUAGE\}\}/g, lang);
 
-  return `${basePrompt}${cardPreamble ? `\n\nCHARACTER PROFILE:${cardPreamble}` : ''}${timeSection}${moodSection}
+  const weatherSection = options?.weatherContext || '';
+  const connectorSection = options?.connectorContext || '';
+
+  return `${basePrompt}${cardPreamble ? `\n\nCHARACTER PROFILE:${cardPreamble}` : ''}${timeSection}${weatherSection}${connectorSection}${moodSection}
 
 ## COMPANION GUIDELINES & RESPONSE FORMAT
 1. ALWAYS start your reply with exactly ONE emotion tag from: [HAPPY], [SAD], [SURPRISED], [ANGRY], [THINKING], [NEUTRAL].
@@ -122,16 +131,26 @@ export function buildSystemPrompt(
 3. You can change your costume/outfit when asked using [costume: <slug>]. Available outfits: ${costumeListStr || 'default'}. Always use the exact slug or name in the tag.
 4. Keep replies natural, expressive, and conversational (1-3 sentences).
 5. Never break character. You are ${charName}.
-6. Speak your dialogue directly to the user (${ownerName}). Avoid meta-commentary or wrapping in thought tags.${memorySection}`;
+6. Speak your dialogue directly to the user (${ownerName}). Avoid meta-commentary or wrapping in thought tags.
+7. When recommending, singing, or asked to play a song from your known songs list, use the tag [music: <Song Title>] (e.g. [music: Palette]). Chat will automatically render an interactive player with audio preview and streaming links (Spotify, YouTube Music, Apple Music).
+8. When discussing the weather, temperature, or outdoor conditions, include [weather] (or [weather: CityName]) in your response to present an interactive live weather card to the user.
+9. When discussing upcoming calendar events, meetings, or schedule, include [calendar] in your response to display the user's interactive schedule agenda card.
+10. When discussing to-dos, tasks, or workspace items, include [tasks] in your response to display their interactive task checklist card.
+11. When discussing recent news articles or RSS feeds, include [news] in your response to display the interactive news feed card.${memorySection}`;
 }
 
 export function buildConversationMessages(
   character: CharacterRow,
   history: { role: 'user' | 'assistant'; content: string; created_at?: number }[],
-  latestUserMessage: string
+  latestUserMessage: string,
+  options?: SystemPromptOptions
 ): PromptMessage[] {
   const lastMsgTime = history.length > 0 ? history[history.length - 1].created_at : undefined;
-  const systemPrompt = buildSystemPrompt(character, { lastMessageTime: lastMsgTime });
+  const systemPrompt = buildSystemPrompt(character, {
+    lastMessageTime: lastMsgTime,
+    weatherContext: options?.weatherContext,
+    connectorContext: options?.connectorContext
+  });
   const msgs: PromptMessage[] = [{ role: 'system', content: systemPrompt }];
 
   // If conversation history is empty, insert few-shot example messages from character.json if available

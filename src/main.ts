@@ -121,13 +121,20 @@ const settingIdleTalkEnabled = document.getElementById('setting-idle-talk-enable
 const settingSleepCycleEnabled = document.getElementById('setting-sleep-cycle-enabled') as HTMLInputElement;
 const settingWeatherEnabled = document.getElementById('setting-weather-enabled') as HTMLInputElement;
 const settingWeatherCity = document.getElementById('setting-weather-city') as HTMLInputElement;
+const btnTestWeather = document.getElementById('btn-test-weather') as HTMLButtonElement;
+const weatherTestStatus = document.getElementById('weather-test-status') as HTMLDivElement;
 const settingLlmFallback1 = document.getElementById('setting-llm-fallback-1') as HTMLSelectElement;
 const settingLlmFallback2 = document.getElementById('setting-llm-fallback-2') as HTMLSelectElement;
 const settingSttEnabled = document.getElementById('setting-stt-enabled') as HTMLInputElement;
 const settingFreshrssEnabled = document.getElementById('setting-freshrss-enabled') as HTMLInputElement;
 const settingFreshrssUrl = document.getElementById('setting-freshrss-url') as HTMLInputElement;
+const settingFreshrssUser = document.getElementById('setting-freshrss-user') as HTMLInputElement;
+const settingFreshrssPassword = document.getElementById('setting-freshrss-password') as HTMLInputElement;
 const settingNotionEnabled = document.getElementById('setting-notion-enabled') as HTMLInputElement;
 const settingNotionApiKey = document.getElementById('setting-notion-api-key') as HTMLInputElement;
+const settingNotionDatabaseId = document.getElementById('setting-notion-database-id') as HTMLInputElement;
+const settingCalendarEnabled = document.getElementById('setting-calendar-enabled') as HTMLInputElement;
+const settingCalendarIcsUrl = document.getElementById('setting-calendar-ics-url') as HTMLInputElement;
 const settingGoogleEnabled = document.getElementById('setting-google-enabled') as HTMLInputElement;
 const settingNextcloudEnabled = document.getElementById('setting-nextcloud-enabled') as HTMLInputElement;
 const settingDebugMode = document.getElementById('setting-debug-mode') as HTMLInputElement;
@@ -284,6 +291,427 @@ function renderChatErrorCard(
 
   card.appendChild(actions);
   bubble.appendChild(card);
+}
+
+// In-Chat Music Card Component (with 30s Audio Stream & Streaming Platform Links)
+function renderMusicCard(container: HTMLElement, track: any) {
+  if (!container || !track || (!track.title && !track.name)) return;
+  const title = track.title || track.name || 'Unknown Track';
+  // Avoid duplicate cards for the exact same track title in this container
+  if (container.querySelector(`[data-track-key="${escapeHtml(title)}"]`)) {
+    return;
+  }
+
+  const artist = track.artist || 'Unknown Artist';
+  const album = track.album || '';
+  const previewUrl = track.previewUrl || track.preview_url || '';
+  const artworkUrl = track.artworkUrl || track.artwork_url || '';
+  const spotifyUrl = track.spotifyUrl || track.spotify_url || `https://open.spotify.com/search/${encodeURIComponent(title + ' ' + artist)}`;
+  const ytMusicUrl = track.ytMusicUrl || track.yt_music_url || `https://music.youtube.com/search?q=${encodeURIComponent(title + ' ' + artist)}`;
+  const appleMusicUrl = track.appleMusicUrl || track.apple_music_url || track.trackViewUrl || `https://music.apple.com/search?term=${encodeURIComponent(title + ' ' + artist)}`;
+  const youtubeUrl = track.youtubeUrl || track.youtube_url || `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' ' + artist)}`;
+
+  const card = document.createElement('div');
+  card.className = 'chat-music-card';
+  card.setAttribute('data-track-key', title);
+
+  const header = document.createElement('div');
+  header.className = 'music-card-header';
+
+  let artImg: HTMLImageElement | null = null;
+  if (artworkUrl) {
+    artImg = document.createElement('img');
+    artImg.className = 'music-card-art';
+    artImg.src = artworkUrl;
+    artImg.alt = title;
+    header.appendChild(artImg);
+  }
+
+  const fallback = document.createElement('div');
+  fallback.className = 'music-card-art-fallback';
+  fallback.textContent = '🎵';
+  if (artworkUrl) {
+    fallback.style.display = 'none';
+    if (artImg) {
+      artImg.onerror = () => {
+        artImg!.style.display = 'none';
+        fallback.style.display = 'flex';
+      };
+    }
+  }
+  header.appendChild(fallback);
+
+  const info = document.createElement('div');
+  info.className = 'music-card-info';
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'music-card-title';
+  titleEl.textContent = title;
+  info.appendChild(titleEl);
+
+  const artistEl = document.createElement('div');
+  artistEl.className = 'music-card-artist';
+  artistEl.textContent = artist;
+  info.appendChild(artistEl);
+
+  if (album) {
+    const albumEl = document.createElement('div');
+    albumEl.className = 'music-card-album';
+    albumEl.textContent = album;
+    info.appendChild(albumEl);
+  }
+  header.appendChild(info);
+  card.appendChild(header);
+
+  // Audio Preview Player (30-second studio sample from iTunes API)
+  if (previewUrl) {
+    const audio = document.createElement('audio');
+    audio.className = 'music-audio-player';
+    audio.controls = true;
+    audio.src = previewUrl;
+    audio.preload = 'none';
+    card.appendChild(audio);
+  }
+
+  // Streaming platform pills (Spotify, YT Music, Apple Music, YouTube)
+  const pills = document.createElement('div');
+  pills.className = 'music-streaming-pills';
+
+  const label = document.createElement('span');
+  label.className = 'music-pill-label';
+  label.textContent = 'Listen on:';
+  pills.appendChild(label);
+
+  const platforms = [
+    { name: 'Spotify', cls: 'spotify', url: spotifyUrl, icon: '🟢' },
+    { name: 'YT Music', cls: 'yt-music', url: ytMusicUrl, icon: '🔴' },
+    { name: 'Apple Music', cls: 'apple-music', url: appleMusicUrl, icon: '🍎' },
+    { name: 'YouTube', cls: 'youtube', url: youtubeUrl, icon: '▶️' }
+  ];
+
+  for (const p of platforms) {
+    if (!p.url) continue;
+    const a = document.createElement('a');
+    a.className = `music-pill ${p.cls}`;
+    a.href = p.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.innerHTML = `<span>${p.icon}</span> <span>${p.name}</span>`;
+    pills.appendChild(a);
+  }
+
+  card.appendChild(pills);
+  container.appendChild(card);
+}
+
+function getWeatherEmoji(code: number): string {
+  if (code === 0 || code === 1) return '☀️';
+  if (code === 2 || code === 3) return '⛅';
+  if (code === 45 || code === 48) return '🌫️';
+  if (code >= 51 && code <= 67) return '🌧️';
+  if (code >= 71 && code <= 77) return '❄️';
+  if (code >= 80 && code <= 82) return '🌦️';
+  if (code >= 95) return '⛈️';
+  return '🌤️';
+}
+
+function renderWeatherCard(container: HTMLElement, data: any) {
+  if (!container || !data) return;
+  const weather = data.data || data;
+  if (!weather || !weather.current) return;
+  if (container.querySelector('.chat-weather-card')) return;
+
+  const card = document.createElement('div');
+  card.className = 'chat-rich-card chat-weather-card';
+
+  const current = weather.current;
+  const emoji = getWeatherEmoji(current.weather_code ?? 0);
+
+  const mainRow = document.createElement('div');
+  mainRow.className = 'weather-main-row';
+
+  const iconBox = document.createElement('div');
+  iconBox.className = 'weather-icon-box';
+  iconBox.textContent = emoji;
+  mainRow.appendChild(iconBox);
+
+  const infoBox = document.createElement('div');
+  infoBox.className = 'weather-info-box';
+
+  const tempRow = document.createElement('div');
+  tempRow.className = 'weather-temp-row';
+
+  const tempEl = document.createElement('div');
+  tempEl.className = 'weather-temp';
+  tempEl.textContent = `${Math.round(current.temperature)}°C`;
+  tempRow.appendChild(tempEl);
+
+  if (current.feels_like !== undefined) {
+    const feelsEl = document.createElement('div');
+    feelsEl.className = 'weather-feels';
+    feelsEl.textContent = `Feels ${Math.round(current.feels_like)}°C`;
+    tempRow.appendChild(feelsEl);
+  }
+  infoBox.appendChild(tempRow);
+
+  const condEl = document.createElement('div');
+  condEl.className = 'weather-condition';
+  condEl.textContent = current.description || 'Current Weather';
+  infoBox.appendChild(condEl);
+
+  if (weather.location) {
+    const locEl = document.createElement('div');
+    locEl.className = 'weather-location';
+    locEl.innerHTML = `📍 <span>${escapeHtml(weather.location)}</span>`;
+    infoBox.appendChild(locEl);
+  }
+
+  mainRow.appendChild(infoBox);
+  card.appendChild(mainRow);
+
+  // Metrics Strip (Humidity, Wind)
+  const metrics = document.createElement('div');
+  metrics.className = 'weather-metrics-strip';
+
+  if (current.humidity !== undefined) {
+    const hum = document.createElement('div');
+    hum.className = 'weather-metric-pill';
+    hum.textContent = `💧 ${current.humidity}% Humidity`;
+    metrics.appendChild(hum);
+  }
+  if (current.wind_speed !== undefined) {
+    const wind = document.createElement('div');
+    wind.className = 'weather-metric-pill';
+    wind.textContent = `💨 ${current.wind_speed} km/h Wind`;
+    metrics.appendChild(wind);
+  }
+  card.appendChild(metrics);
+
+  // 3-Day Forecast Grid
+  if (Array.isArray(weather.forecast) && weather.forecast.length > 0) {
+    const forecastGrid = document.createElement('div');
+    forecastGrid.className = 'weather-forecast-grid';
+
+    const days = weather.forecast.slice(0, 3);
+    for (const f of days) {
+      const dayEl = document.createElement('div');
+      dayEl.className = 'weather-forecast-day';
+
+      const dateLabel = document.createElement('div');
+      dateLabel.className = 'forecast-date';
+      const parsedDate = new Date(f.date + 'T12:00:00Z');
+      const isInvalid = Number.isNaN(parsedDate.getTime());
+      dateLabel.textContent = isInvalid ? f.date : parsedDate.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+      dayEl.appendChild(dateLabel);
+
+      const fIcon = document.createElement('div');
+      fIcon.className = 'forecast-icon';
+      fIcon.textContent = getWeatherEmoji(f.code ?? 0);
+      dayEl.appendChild(fIcon);
+
+      const fTemp = document.createElement('div');
+      fTemp.className = 'forecast-temp';
+      fTemp.textContent = `${Math.round(f.temp_max)}° / ${Math.round(f.temp_min)}°`;
+      dayEl.appendChild(fTemp);
+
+      if (f.rain_chance > 0) {
+        const fRain = document.createElement('div');
+        fRain.className = 'forecast-rain';
+        fRain.textContent = `🌧️ ${f.rain_chance}%`;
+        dayEl.appendChild(fRain);
+      }
+
+      forecastGrid.appendChild(dayEl);
+    }
+    card.appendChild(forecastGrid);
+  }
+
+  container.appendChild(card);
+}
+
+function renderCalendarCard(container: HTMLElement, eventsData: any) {
+  if (!container || !eventsData) return;
+  if (container.querySelector('.chat-calendar-card')) return;
+
+  const events: any[] = Array.isArray(eventsData) ? eventsData : eventsData.events || [];
+
+  const card = document.createElement('div');
+  card.className = 'chat-rich-card chat-calendar-card';
+
+  const header = document.createElement('div');
+  header.className = 'rich-card-header-row';
+  header.innerHTML = `
+    <div class="rich-card-title-wrap">
+      <span>📅</span> <span>Upcoming Schedule</span>
+    </div>
+    <div class="rich-card-badge" style="background: rgba(168, 85, 247, 0.2); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.4);">
+      ${events.length} ${events.length === 1 ? 'event' : 'events'}
+    </div>
+  `;
+  card.appendChild(header);
+
+  if (events.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'calendar-empty-note';
+    empty.textContent = 'No upcoming events scheduled for the next 48 hours.';
+    card.appendChild(empty);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'calendar-events-list';
+
+    for (const ev of events.slice(0, 4)) {
+      const item = document.createElement('div');
+      item.className = 'calendar-event-item';
+
+      const timeBadge = document.createElement('div');
+      timeBadge.className = 'calendar-time-badge';
+      timeBadge.innerHTML = `⏰ <span>${escapeHtml(ev.start || 'Soon')}</span>`;
+      item.appendChild(timeBadge);
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'calendar-event-title';
+      titleEl.textContent = ev.title || 'Untitled Event';
+      item.appendChild(titleEl);
+
+      if (ev.location) {
+        const locEl = document.createElement('div');
+        locEl.className = 'calendar-event-location';
+        locEl.innerHTML = `📍 <span>${escapeHtml(ev.location)}</span>`;
+        item.appendChild(locEl);
+      }
+
+      list.appendChild(item);
+    }
+    card.appendChild(list);
+  }
+
+  container.appendChild(card);
+}
+
+function renderTasksCard(container: HTMLElement, tasksData: any) {
+  if (!container || !tasksData) return;
+  if (container.querySelector('.chat-tasks-card')) return;
+
+  const tasks: any[] = Array.isArray(tasksData) ? tasksData : tasksData.tasks || [];
+
+  const card = document.createElement('div');
+  card.className = 'chat-rich-card chat-tasks-card';
+
+  const header = document.createElement('div');
+  header.className = 'rich-card-header-row';
+  header.innerHTML = `
+    <div class="rich-card-title-wrap">
+      <span>📝</span> <span>Workspace Tasks</span>
+    </div>
+    <div class="rich-card-badge" style="background: rgba(52, 211, 153, 0.2); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.4);">
+      Notion
+    </div>
+  `;
+  card.appendChild(header);
+
+  if (tasks.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'calendar-empty-note';
+    empty.textContent = 'All workspace tasks are up to date!';
+    card.appendChild(empty);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'tasks-list';
+
+    for (const t of tasks.slice(0, 5)) {
+      const row = document.createElement('div');
+      row.className = 'task-item-row';
+
+      const status = (t.status || 'To Do').toLowerCase();
+      let statusClass = 'todo';
+      if (status.includes('done') || status.includes('complete')) statusClass = 'done';
+      else if (status.includes('progress') || status.includes('doing') || status.includes('active')) statusClass = 'in-progress';
+
+      const pill = document.createElement('span');
+      pill.className = `task-status-pill ${statusClass}`;
+      pill.textContent = t.status || 'To Do';
+      row.appendChild(pill);
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'task-title-text';
+      titleEl.textContent = t.title || 'Untitled Task';
+      titleEl.title = t.title || '';
+      row.appendChild(titleEl);
+
+      list.appendChild(row);
+    }
+    card.appendChild(list);
+  }
+
+  container.appendChild(card);
+}
+
+function renderNewsCard(container: HTMLElement, newsData: any) {
+  if (!container || !newsData) return;
+  if (container.querySelector('.chat-news-card')) return;
+
+  const articles: any[] = Array.isArray(newsData) ? newsData : newsData.articles || [];
+  if (articles.length === 0) return;
+
+  const card = document.createElement('div');
+  card.className = 'chat-rich-card chat-news-card';
+
+  const header = document.createElement('div');
+  header.className = 'rich-card-header-row';
+  header.innerHTML = `
+    <div class="rich-card-title-wrap">
+      <span>📰</span> <span>Recent News</span>
+    </div>
+    <div class="rich-card-badge" style="background: rgba(251, 113, 133, 0.2); color: #fda4af; border: 1px solid rgba(251, 113, 133, 0.4);">
+      FreshRSS
+    </div>
+  `;
+  card.appendChild(header);
+
+  const list = document.createElement('div');
+  list.className = 'news-articles-list';
+
+  for (const art of articles.slice(0, 3)) {
+    const item = document.createElement(art.url ? 'a' : 'div') as HTMLElement;
+    item.className = 'news-article-link';
+    if (art.url) {
+      (item as HTMLAnchorElement).href = art.url;
+      (item as HTMLAnchorElement).target = '_blank';
+      (item as HTMLAnchorElement).rel = 'noopener noreferrer';
+    }
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'news-article-title';
+    titleEl.textContent = art.title || 'Untitled Article';
+    item.appendChild(titleEl);
+
+    if (art.source) {
+      const srcEl = document.createElement('span');
+      srcEl.className = 'news-source-pill';
+      srcEl.textContent = art.source;
+      item.appendChild(srcEl);
+    }
+
+    list.appendChild(item);
+  }
+  card.appendChild(list);
+
+  container.appendChild(card);
+}
+
+function renderRichCard(container: HTMLElement, cardType: string, data: any) {
+  if (!container || !data) return;
+  if (cardType === 'weather') {
+    renderWeatherCard(container, data);
+  } else if (cardType === 'calendar') {
+    renderCalendarCard(container, data);
+  } else if (cardType === 'tasks') {
+    renderTasksCard(container, data);
+  } else if (cardType === 'news') {
+    renderNewsCard(container, data);
+  } else if (cardType === 'music') {
+    renderMusicCard(container, data);
+  }
 }
 
 // Toast Helper
@@ -932,8 +1360,102 @@ function populateCostumeSelector(costumes: Costume[], activeId: string) {
   }
 }
 
-// Conversation History & Chat rendering
+// Conversation History, Timestamps & Date Separator tracking
 let activeConversationId = '';
+let lastRenderedChatDateKey: string | null = null;
+const renderedMessageIds = new Set<string>();
+
+function resetChatDateTracker() {
+  lastRenderedChatDateKey = null;
+  renderedMessageIds.clear();
+}
+
+function getCalendarDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatBubbleTimestamp(timestamp?: number): { display: string; title: string } {
+  const d = timestamp ? new Date(timestamp) : new Date();
+  const now = new Date();
+
+  const msgKey = getCalendarDateKey(d);
+  const todayKey = getCalendarDateKey(now);
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = getCalendarDateKey(yesterday);
+
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  const fullTitle = d.toLocaleString();
+
+  if (msgKey === todayKey) {
+    return { display: `Today, ${timeStr}`, title: fullTitle };
+  }
+  if (msgKey === yesterdayKey) {
+    return { display: `Yesterday, ${timeStr}`, title: fullTitle };
+  }
+
+  // Older message
+  const sameYear = d.getFullYear() === now.getFullYear();
+  const dateStr = d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    ...(sameYear ? {} : { year: 'numeric' })
+  });
+  return { display: `${dateStr}, ${timeStr}`, title: fullTitle };
+}
+
+function formatDateSeparatorLabel(d: Date): string {
+  const now = new Date();
+  const msgKey = getCalendarDateKey(d);
+  const todayKey = getCalendarDateKey(now);
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = getCalendarDateKey(yesterday);
+
+  if (msgKey === todayKey) return 'Today';
+  if (msgKey === yesterdayKey) return 'Yesterday';
+
+  return d.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+  });
+}
+
+function maybeAppendDateSeparator(container: HTMLElement, timestamp?: number) {
+  if (!container) return;
+  const d = timestamp ? new Date(timestamp) : new Date();
+  const msgKey = getCalendarDateKey(d);
+
+  if (lastRenderedChatDateKey !== msgKey) {
+    lastRenderedChatDateKey = msgKey;
+
+    const sep = document.createElement('div');
+    sep.className = 'chat-date-separator';
+
+    const lineLeft = document.createElement('div');
+    lineLeft.className = 'date-sep-line';
+
+    const pill = document.createElement('div');
+    pill.className = 'date-sep-pill';
+    pill.textContent = formatDateSeparatorLabel(d);
+
+    const lineRight = document.createElement('div');
+    lineRight.className = 'date-sep-line';
+
+    sep.appendChild(lineLeft);
+    sep.appendChild(pill);
+    sep.appendChild(lineRight);
+
+    container.appendChild(sep);
+  }
+}
 
 async function loadConversationHistory(characterId: string) {
   if (!chatMessagesEl) return;
@@ -948,8 +1470,25 @@ async function loadConversationHistory(characterId: string) {
     const msgs = await msgsRes.json();
 
     chatMessagesEl.innerHTML = '';
+    resetChatDateTracker();
     for (const m of msgs) {
-      appendMessageBubble(m.role, m.content, m.emotion, m.motion, m.audio_url, m.thought, m.costume, m.raw_content);
+      if (m.id) {
+        renderedMessageIds.add(m.id);
+      }
+      appendMessageBubble(
+        m.role,
+        m.content,
+        m.emotion,
+        m.motion,
+        m.audio_url,
+        m.thought,
+        m.costume,
+        m.raw_content,
+        m.music_track,
+        m.cards,
+        m.created_at,
+        m.id
+      );
     }
   } catch (e) {
     console.warn('[history] Failed to load messages:', e);
@@ -1029,8 +1568,24 @@ function appendMessageBubble(
   audioUrl?: string,
   thought?: string,
   costume?: string,
-  rawContent?: string
+  rawContent?: string,
+  musicTrack?: any,
+  cards?: Array<{ type: string; data: any }>,
+  timestamp?: number,
+  messageId?: string
 ): HTMLDivElement {
+  if (messageId) {
+    if (renderedMessageIds.has(messageId)) {
+      const existing = chatMessagesEl?.querySelector(`[data-message-id="${messageId}"]`) as HTMLDivElement | null;
+      if (existing) return existing;
+    }
+    renderedMessageIds.add(messageId);
+  }
+
+  if (chatMessagesEl) {
+    maybeAppendDateSeparator(chatMessagesEl, timestamp);
+  }
+
   // Extract and strip any embedded <think>...</think> from content (for historical or raw messages)
   let thoughtText = thought || '';
   const thinkRegex = /<(?:think|thought|reasoning)[^>]*>([\s\S]*?)<\/(?:think|thought|reasoning)>/i;
@@ -1042,6 +1597,9 @@ function appendMessageBubble(
 
   const row = document.createElement('div');
   row.className = `msg-row ${role}`;
+  if (messageId) {
+    row.setAttribute('data-message-id', messageId);
+  }
 
   const meta = document.createElement('div');
   meta.className = 'msg-meta';
@@ -1067,6 +1625,13 @@ function appendMessageBubble(
     costumePill.textContent = `👔 ${costume}`;
     meta.appendChild(costumePill);
   }
+
+  const timeInfo = formatBubbleTimestamp(timestamp);
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'msg-time';
+  timeSpan.title = timeInfo.title;
+  timeSpan.textContent = timeInfo.display;
+  meta.appendChild(timeSpan);
 
   const bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
@@ -1097,6 +1662,16 @@ function appendMessageBubble(
     const { details, rawBtn } = createRawDebugElement(rawToDisplay);
     meta.appendChild(rawBtn);
     bubble.appendChild(details);
+  }
+
+  if (musicTrack) {
+    renderMusicCard(bubble, musicTrack);
+  }
+
+  if (Array.isArray(cards)) {
+    for (const c of cards) {
+      renderRichCard(bubble, c.type, c.data);
+    }
   }
 
   row.appendChild(meta);
@@ -1150,15 +1725,20 @@ function setupUI(
     chatInput.value = '';
     adjustChatInputHeight();
 
+    const msgTime = Date.now();
     debugManager.log('AI', `User sent: "${text.slice(0, 60)}"`, { text });
-    appendMessageBubble('user', text);
+    appendMessageBubble('user', text, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, msgTime);
 
     // Placeholder assistant bubble with streaming cursor
+    if (chatMessagesEl) {
+      maybeAppendDateSeparator(chatMessagesEl, msgTime);
+    }
+    const timeInfo = formatBubbleTimestamp(msgTime);
     const pendingRow = document.createElement('div');
-    pendingRow.className = 'msg-row assistant';
+    pendingRow.className = 'msg-row assistant is-pending';
     const pendingMeta = document.createElement('div');
     pendingMeta.className = 'msg-meta';
-    pendingMeta.innerHTML = '<span>Companion</span><span class="tag-pill">THINKING</span>';
+    pendingMeta.innerHTML = `<span>Companion</span><span class="tag-pill">THINKING</span><span class="msg-time" title="${timeInfo.title}">${timeInfo.display}</span>`;
     const pendingBubble = document.createElement('div');
     pendingBubble.className = 'msg-bubble';
     const cursor = document.createElement('span');
@@ -1181,6 +1761,7 @@ function setupUI(
       });
 
       if (!res.ok) {
+        pendingRow.classList.remove('is-pending');
         let errData: any = {};
         try {
           errData = await res.json();
@@ -1217,6 +1798,8 @@ function setupUI(
       let streamedText = '';
       let receivedAudioUrl = '';
       let receivedThought = '';
+      let receivedMusicTrack: any = null;
+      let receivedCards: Array<{ type: string; data: any }> = [];
       let doneData: any = null;
       let isError = false;
 
@@ -1242,8 +1825,19 @@ function setupUI(
                 receivedThought += data.thought;
               } else if (data.type === 'audio') {
                 receivedAudioUrl = data.audio_url;
+              } else if (data.type === 'music') {
+                receivedMusicTrack = data.track;
+                renderMusicCard(pendingBubble, data.track);
+                chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+              } else if (data.type === 'card') {
+                if (data.cardType && data.data && !receivedCards.some(rc => rc.type === data.cardType)) {
+                  receivedCards.push({ type: data.cardType, data: data.data });
+                  renderRichCard(pendingBubble, data.cardType, data.data);
+                  chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+                }
               } else if (data.type === 'error') {
                 isError = true;
+                pendingRow.classList.remove('is-pending');
                 cursor.remove();
                 debugManager.log('AI', data.title || 'AI Error', data, undefined, 'error');
                 showTopNotice('error', data.title || 'AI Model Error', data.error || data.message || 'Stream error', {
@@ -1262,9 +1856,24 @@ function setupUI(
               } else if (data.type === 'done') {
                 doneData = data;
                 cursor.remove();
+                if (data.message?.id) {
+                  pendingRow.setAttribute('data-message-id', data.message.id);
+                  pendingRow.classList.remove('is-pending');
+                  renderedMessageIds.add(data.message.id);
+                }
                 if (data.thought) receivedThought = data.thought;
                 if (data.message?.thought) receivedThought = data.message.thought;
                 if (data.message?.audio_url) receivedAudioUrl = data.message.audio_url;
+                if (data.music_track && !receivedMusicTrack) {
+                  receivedMusicTrack = data.music_track;
+                }
+                if (Array.isArray(data.cards)) {
+                  for (const c of data.cards) {
+                    if (!receivedCards.some(rc => rc.type === c.type)) {
+                      receivedCards.push(c);
+                    }
+                  }
+                }
 
                 if (data.debug) {
                   debugManager.setLatestRaw(data.debug.raw_output || streamedText, {
@@ -1291,12 +1900,20 @@ function setupUI(
                   metaHtml += `<span class="tag-pill costume">👔 ${data.message.costume}</span>`;
                   void onSwitchCostume(data.message.costume);
                 }
+                const replyTime = data.message?.created_at ? formatBubbleTimestamp(data.message.created_at) : timeInfo;
+                metaHtml += `<span class="msg-time" title="${replyTime.title}">${replyTime.display}</span>`;
                 pendingMeta.innerHTML = metaHtml;
               }
             } catch {}
           }
           if (isError) break;
         }
+      }
+
+      pendingRow.classList.remove('is-pending');
+      if (doneData?.message?.id) {
+        pendingRow.setAttribute('data-message-id', doneData.message.id);
+        renderedMessageIds.add(doneData.message.id);
       }
 
       if (isError) return;
@@ -1324,6 +1941,15 @@ function setupUI(
       textSpan.innerHTML = renderMarkdown(streamedText.trim());
       pendingBubble.appendChild(textSpan);
 
+      if (receivedMusicTrack) {
+        renderMusicCard(pendingBubble, receivedMusicTrack);
+      }
+      if (receivedCards.length > 0) {
+        for (const c of receivedCards) {
+          renderRichCard(pendingBubble, c.type, c.data);
+        }
+      }
+
       // In Debug / Raw Mode: Show collapsible original raw AI output with inline copy and pill toggle
       const rawTextToDisplay = doneData?.debug?.raw_output || doneData?.message?.raw_content || streamedText;
       if (rawTextToDisplay) {
@@ -1342,6 +1968,7 @@ function setupUI(
       }
     } catch (e: any) {
       cursor.remove();
+      pendingRow.classList.remove('is-pending');
       const errObj = {
         title: 'Network / Communication Error',
         code: 'NETWORK_ERROR',
@@ -1465,6 +2092,7 @@ function setupUI(
     if (confirm('Clear chat history?')) {
       await fetch(`/api/conversations/${activeConversationId}/messages`, { method: 'DELETE' });
       chatMessagesEl.innerHTML = '';
+      resetChatDateTracker();
       showToast('Chat history cleared');
     }
   });
@@ -1796,6 +2424,7 @@ function setupUI(
       if (settingSleepCycleEnabled) settingSleepCycleEnabled.checked = s.sleep_cycle_enabled === 'true';
       if (settingWeatherEnabled) settingWeatherEnabled.checked = s.weather_enabled === 'true';
       if (settingWeatherCity && s.weather_city) settingWeatherCity.value = s.weather_city;
+      if (weatherTestStatus) weatherTestStatus.style.display = 'none';
       if (settingLlmFallback1 && s.llm_fallback_1) settingLlmFallback1.value = s.llm_fallback_1;
       if (settingLlmFallback2 && s.llm_fallback_2) settingLlmFallback2.value = s.llm_fallback_2;
       if (settingSttEnabled) {
@@ -1804,8 +2433,13 @@ function setupUI(
       }
       if (settingFreshrssEnabled) settingFreshrssEnabled.checked = s.freshrss_enabled === 'true';
       if (settingFreshrssUrl && s.freshrss_url) settingFreshrssUrl.value = s.freshrss_url;
+      if (settingFreshrssUser) settingFreshrssUser.value = s.freshrss_user || '';
+      if (settingFreshrssPassword) settingFreshrssPassword.value = s.freshrss_password || s.freshrss_api_password || '';
       if (settingNotionEnabled) settingNotionEnabled.checked = s.notion_enabled === 'true';
       if (settingNotionApiKey && s.notion_api_key) settingNotionApiKey.value = s.notion_api_key;
+      if (settingNotionDatabaseId) settingNotionDatabaseId.value = s.notion_database_id || '';
+      if (settingCalendarEnabled) settingCalendarEnabled.checked = s.calendar_enabled === 'true';
+      if (settingCalendarIcsUrl) settingCalendarIcsUrl.value = s.calendar_ics_url || '';
       if (settingGoogleEnabled) settingGoogleEnabled.checked = s.google_enabled === 'true';
       if (settingNextcloudEnabled) settingNextcloudEnabled.checked = s.nextcloud_enabled === 'true';
 
@@ -1929,6 +2563,47 @@ function setupUI(
     }
   });
 
+  // Weather Connection Test
+  btnTestWeather?.addEventListener('click', async () => {
+    const city = (settingWeatherCity?.value || '').trim();
+    if (!city) {
+      if (weatherTestStatus) {
+        weatherTestStatus.style.display = 'block';
+        weatherTestStatus.style.color = '#ef4444';
+        weatherTestStatus.textContent = '⚠️ Please enter a city name first.';
+      }
+      return;
+    }
+
+    btnTestWeather.disabled = true;
+    btnTestWeather.textContent = '⏳ Testing...';
+    if (weatherTestStatus) {
+      weatherTestStatus.style.display = 'block';
+      weatherTestStatus.style.color = '#94a3b8';
+      weatherTestStatus.textContent = `Resolving coordinates for "${city}"...`;
+    }
+
+    try {
+      const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
+      const json = await res.json();
+      const weather = json.data || json;
+      if (res.ok && weather && weather.current) {
+        weatherTestStatus.style.color = '#10b981';
+        weatherTestStatus.innerHTML = `✅ <strong>${escapeHtml(weather.location)}</strong>: ${escapeHtml(weather.current.description)}, ${weather.current.temperature}°C (Feels like ${weather.current.feels_like}°C, Humidity ${weather.current.humidity}%)`;
+        showToast(`🌤️ Weather connected for ${weather.location}!`, 3000);
+      } else {
+        weatherTestStatus.style.color = '#ef4444';
+        weatherTestStatus.textContent = `❌ ${json.error || 'Could not find weather data for this location.'}`;
+      }
+    } catch (e: any) {
+      weatherTestStatus.style.color = '#ef4444';
+      weatherTestStatus.textContent = `❌ Network error: ${e.message}`;
+    } finally {
+      btnTestWeather.disabled = false;
+      btnTestWeather.textContent = '🌤️ Test';
+    }
+  });
+
   btnSaveSettings?.addEventListener('click', async () => {
     const cur = getCurChar();
 
@@ -1975,8 +2650,14 @@ function setupUI(
       stt_enabled: String(settingSttEnabled?.checked ?? false),
       freshrss_enabled: String(settingFreshrssEnabled?.checked ?? false),
       freshrss_url: settingFreshrssUrl?.value || '',
+      freshrss_user: settingFreshrssUser?.value || '',
+      freshrss_password: settingFreshrssPassword?.value || '',
+      freshrss_api_password: settingFreshrssPassword?.value || '',
       notion_enabled: String(settingNotionEnabled?.checked ?? false),
       notion_api_key: settingNotionApiKey?.value || '',
+      notion_database_id: settingNotionDatabaseId?.value || '',
+      calendar_enabled: String(settingCalendarEnabled?.checked ?? false),
+      calendar_ics_url: settingCalendarIcsUrl?.value || '',
       google_enabled: String(settingGoogleEnabled?.checked ?? false),
       nextcloud_enabled: String(settingNextcloudEnabled?.checked ?? false)
     };
@@ -2142,12 +2823,75 @@ function setupWebSocket(
           }
           break;
 
+        case 'chat_audio':
+          if (msg.emotion) triggerEmotion(msg.emotion);
+          if (msg.audio_url) lipSync.play(msg.audio_url).catch(console.error);
+          break;
+
         case 'chat':
           if (msg.emotion) triggerEmotion(msg.emotion);
           if (msg.motion) void stage().playMotion(msg.motion);
           if (msg.audio_url) lipSync.play(msg.audio_url).catch(console.error);
-          if (msg.reply && msg.message_id) {
-            appendMessageBubble('assistant', msg.reply, msg.emotion, msg.motion, msg.audio_url, msg.thought, msg.costume, msg.raw_content);
+
+          if (msg.message_id) {
+            // Check if already rendered or if active pending stream belongs to this
+            if (renderedMessageIds.has(msg.message_id) || chatMessagesEl?.querySelector(`[data-message-id="${msg.message_id}"]`)) {
+              break;
+            }
+            const pendingEl = chatMessagesEl?.querySelector('.msg-row.assistant.is-pending') as HTMLElement | null;
+            if (pendingEl) {
+              pendingEl.setAttribute('data-message-id', msg.message_id);
+              pendingEl.classList.remove('is-pending');
+              renderedMessageIds.add(msg.message_id);
+              break;
+            }
+          }
+
+          if (msg.reply) {
+            appendMessageBubble(
+              'assistant',
+              msg.reply,
+              msg.emotion,
+              msg.motion,
+              msg.audio_url,
+              msg.thought,
+              msg.costume,
+              msg.raw_content,
+              msg.music_track,
+              msg.cards,
+              msg.created_at,
+              msg.message_id
+            );
+          }
+          break;
+
+        case 'chat_music':
+          // If there is an active pending stream in this tab, skip to avoid race condition with SSE
+          if (chatMessagesEl?.querySelector('.msg-row.assistant.is-pending')) {
+            break;
+          }
+          if (msg.track) {
+            const bubbles = chatMessagesEl.querySelectorAll('.msg-row.assistant .msg-bubble');
+            const latestBubble = bubbles[bubbles.length - 1] as HTMLElement;
+            if (latestBubble) {
+              renderMusicCard(latestBubble, msg.track);
+              chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+            }
+          }
+          break;
+
+        case 'chat_card':
+          // If there is an active pending stream in this tab, skip to avoid race condition with SSE
+          if (chatMessagesEl?.querySelector('.msg-row.assistant.is-pending')) {
+            break;
+          }
+          if (msg.cardType && msg.data) {
+            const bubbles = chatMessagesEl.querySelectorAll('.msg-row.assistant .msg-bubble');
+            const latestBubble = bubbles[bubbles.length - 1] as HTMLElement;
+            if (latestBubble) {
+              renderRichCard(latestBubble, msg.cardType, msg.data);
+              chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+            }
           }
           break;
 

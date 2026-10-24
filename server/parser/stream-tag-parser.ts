@@ -1,6 +1,7 @@
 export interface ParsedTag {
-  type: 'emotion' | 'expression' | 'motion' | 'costume';
+  type: 'emotion' | 'expression' | 'motion' | 'costume' | 'music' | 'card';
   value: string;
+  cardType?: 'weather' | 'calendar' | 'tasks' | 'news';
 }
 
 export interface StreamTagParserCallbacks {
@@ -21,6 +22,8 @@ export class StreamTagParser {
   private detectedExpression: string = '';
   private detectedMotion: string = '';
   private detectedCostume: string = '';
+  private detectedMusic: string = '';
+  private detectedCards: Array<{ type: 'weather' | 'calendar' | 'tasks' | 'news'; value?: string }> = [];
   private sentenceBuffer = '';
   private inThought = false;
 
@@ -159,6 +162,8 @@ export class StreamTagParser {
     expression: string;
     motion: string;
     costume: string;
+    music: string;
+    cards: Array<{ type: 'weather' | 'calendar' | 'tasks' | 'news'; value?: string }>;
   } {
     if (this.buffer) {
       if (this.inThought) {
@@ -188,8 +193,13 @@ export class StreamTagParser {
     }
 
     let clean = this.fullCleanText.trim();
-    // Safety scrub any remaining [costume: ...] or [motion: ...] tags from speech text
-    clean = clean.replace(/\[(?:costume|outfit|motion|expression|emotion):[^\]]+\]/gi, '').trim();
+    // Safety scrub any remaining companion control tags from speech text
+    clean = clean
+      .replace(
+        /\[(?:costume|outfit|motion|expression|emotion|music|song|track|weather|calendar|schedule|events|tasks|notion|todo|news|feed|articles)(?::[^\]]+)?\]/gi,
+        ''
+      )
+      .trim();
 
     return {
       cleanText: clean || (this.fullThoughtText.trim() ? '(smiles softly)' : ''),
@@ -198,7 +208,9 @@ export class StreamTagParser {
       emotion: this.detectedEmotion,
       expression: this.detectedExpression,
       motion: this.detectedMotion,
-      costume: this.detectedCostume
+      costume: this.detectedCostume,
+      music: this.detectedMusic,
+      cards: this.detectedCards
     };
   }
 
@@ -230,18 +242,43 @@ export class StreamTagParser {
   }
 
   private processTag(content: string): void {
-    const upper = content.toUpperCase();
+    const trimmed = content.trim();
+    const upper = trimmed.toUpperCase();
+    const lower = trimmed.toLowerCase();
+
     if (VALID_EMOTIONS.has(upper)) {
       this.detectedEmotion = upper;
       this.callbacks.onTag?.({ type: 'emotion', value: upper });
       return;
     }
 
-    // Check key-value tags like [expression: smile-01], [motion: nod], [costume: casual]
-    const colonIdx = content.indexOf(':') !== -1 ? content.indexOf(':') : content.indexOf('=');
+    // Standalone rich card tags (e.g. [weather], [calendar], [schedule], [tasks], [news])
+    if (lower === 'weather') {
+      this.detectedCards.push({ type: 'weather' });
+      this.callbacks.onTag?.({ type: 'card', value: '', cardType: 'weather' });
+      return;
+    }
+    if (lower === 'calendar' || lower === 'schedule' || lower === 'events') {
+      this.detectedCards.push({ type: 'calendar' });
+      this.callbacks.onTag?.({ type: 'card', value: '', cardType: 'calendar' });
+      return;
+    }
+    if (lower === 'tasks' || lower === 'notion' || lower === 'todo') {
+      this.detectedCards.push({ type: 'tasks' });
+      this.callbacks.onTag?.({ type: 'card', value: '', cardType: 'tasks' });
+      return;
+    }
+    if (lower === 'news' || lower === 'feed' || lower === 'articles') {
+      this.detectedCards.push({ type: 'news' });
+      this.callbacks.onTag?.({ type: 'card', value: '', cardType: 'news' });
+      return;
+    }
+
+    // Check key-value tags like [expression: smile-01], [motion: nod], [costume: casual], [weather: Tokyo]
+    const colonIdx = trimmed.indexOf(':') !== -1 ? trimmed.indexOf(':') : trimmed.indexOf('=');
     if (colonIdx > 0) {
-      const key = content.slice(0, colonIdx).trim().toLowerCase();
-      const val = content.slice(colonIdx + 1).trim();
+      const key = trimmed.slice(0, colonIdx).trim().toLowerCase();
+      const val = trimmed.slice(colonIdx + 1).trim();
 
       if (key === 'expression' || key === 'emotion') {
         if (VALID_EMOTIONS.has(val.toUpperCase())) {
@@ -257,6 +294,21 @@ export class StreamTagParser {
       } else if (key === 'costume' || key === 'outfit') {
         this.detectedCostume = val;
         this.callbacks.onTag?.({ type: 'costume', value: val });
+      } else if (key === 'music' || key === 'song' || key === 'track') {
+        this.detectedMusic = val;
+        this.callbacks.onTag?.({ type: 'music', value: val });
+      } else if (key === 'weather') {
+        this.detectedCards.push({ type: 'weather', value: val });
+        this.callbacks.onTag?.({ type: 'card', value: val, cardType: 'weather' });
+      } else if (key === 'calendar' || key === 'schedule' || key === 'events') {
+        this.detectedCards.push({ type: 'calendar', value: val });
+        this.callbacks.onTag?.({ type: 'card', value: val, cardType: 'calendar' });
+      } else if (key === 'tasks' || key === 'notion' || key === 'todo') {
+        this.detectedCards.push({ type: 'tasks', value: val });
+        this.callbacks.onTag?.({ type: 'card', value: val, cardType: 'tasks' });
+      } else if (key === 'news' || key === 'feed' || key === 'articles') {
+        this.detectedCards.push({ type: 'news', value: val });
+        this.callbacks.onTag?.({ type: 'card', value: val, cardType: 'news' });
       }
     }
   }

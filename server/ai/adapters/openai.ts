@@ -17,12 +17,6 @@ export async function* streamOpenAI(
   const model = options.model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
   const temperature = options.temperature ?? 0.7;
 
-  // Pre-flight check: if targeting official OpenAI and no key is configured
-  const isOfficial = baseUrl.includes('api.openai.com');
-  if (isOfficial && !apiKey) {
-    throw new Error('OpenAI API key is required when connecting to api.openai.com. Please set it in Settings → AI Brain.');
-  }
-
   const url = `${baseUrl}/chat/completions`;
 
   const headers: Record<string, string> = {
@@ -32,30 +26,16 @@ export async function* streamOpenAI(
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature,
-        stream: true,
-      }),
-      signal: controller.signal,
-    });
-  } catch (netErr: any) {
-    clearTimeout(timer);
-    if (netErr?.name === 'AbortError') {
-      throw new Error(`Connection timed out after 30s connecting to OpenAI endpoint ${url}`);
-    }
-    throw netErr;
-  }
-  clearTimeout(timer);
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature,
+      stream: true,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');

@@ -2,9 +2,9 @@ export interface DebugLogItem {
   id: string;
   time: string;
   category: 'AI' | 'WS' | 'TTS' | 'MOOD' | 'INTERACTION' | 'SYSTEM';
-  level: 'info' | 'warn' | 'error';
   title: string;
   data?: any;
+  level?: 'info' | 'warn' | 'error';
 }
 
 class DebugConsoleManager {
@@ -13,11 +13,9 @@ class DebugConsoleManager {
   private activeCategory: string = 'ALL';
   private latestRawOutput: string = '';
   private latestPromptPayload: string = '';
-  private unreadErrorCount: number = 0;
 
   private modal: HTMLElement | null = null;
   private btnToggle: HTMLElement | null = null;
-  private errorBadgeEl: HTMLElement | null = null;
   private rawOutputEl: HTMLElement | null = null;
   private rawProviderEl: HTMLElement | null = null;
   private rawModelEl: HTMLElement | null = null;
@@ -32,7 +30,6 @@ class DebugConsoleManager {
 
     this.modal = document.getElementById('debug-modal');
     this.btnToggle = document.getElementById('btn-toggle-debug');
-    this.errorBadgeEl = document.getElementById('dbg-error-badge');
     this.rawOutputEl = document.getElementById('dbg-raw-output');
     this.rawProviderEl = document.getElementById('dbg-raw-provider');
     this.rawModelEl = document.getElementById('dbg-raw-model');
@@ -129,7 +126,7 @@ class DebugConsoleManager {
       .then((data) => {
         if (Array.isArray(data?.logs)) {
           for (const l of data.logs) {
-            this.log(l.category, l.title, l.data, l.timestamp, l.level);
+            this.log(l.category, l.title, l.data, l.timestamp);
           }
         }
       })
@@ -155,11 +152,6 @@ class DebugConsoleManager {
   }
 
   open() {
-    this.unreadErrorCount = 0;
-    if (this.errorBadgeEl) {
-      this.errorBadgeEl.textContent = '0';
-      this.errorBadgeEl.style.display = 'none';
-    }
     this.modal?.classList.add('active');
   }
 
@@ -180,43 +172,21 @@ class DebugConsoleManager {
     const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) +
       '.' + String(d.getMilliseconds()).padStart(3, '0');
 
-    let resolvedLevel: 'info' | 'warn' | 'error' = level || 'info';
-    if (!level) {
-      const lower = (title + (data ? JSON.stringify(data) : '')).toLowerCase();
-      if (lower.includes('error') || lower.includes('fail') || lower.includes('fatal') || lower.includes('quota') || lower.includes('unreachable')) {
-        resolvedLevel = 'error';
-      } else if (lower.includes('warn') || lower.includes('timeout') || lower.includes('fallback')) {
-        resolvedLevel = 'warn';
-      }
-    }
-
     const item: DebugLogItem = {
       id: `dbg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       time: timeStr,
       category,
-      level: resolvedLevel,
       title,
-      data
+      data,
+      level
     };
-
-    if (resolvedLevel === 'error') {
-      this.unreadErrorCount++;
-      if (this.errorBadgeEl) {
-        this.errorBadgeEl.textContent = String(this.unreadErrorCount);
-        this.errorBadgeEl.style.display = 'inline-block';
-      }
-    }
 
     this.logs.push(item);
     if (this.logs.length > 300) {
       this.logs.shift();
     }
 
-    if (
-      this.activeCategory === 'ALL' ||
-      this.activeCategory === category ||
-      (this.activeCategory === 'ERRORS' && item.level === 'error')
-    ) {
+    if (this.activeCategory === 'ALL' || this.activeCategory === category) {
       this.appendLogToDom(item);
     }
   }
@@ -265,8 +235,6 @@ class DebugConsoleManager {
     this.logsStreamEl.innerHTML = '';
     const filtered = this.activeCategory === 'ALL'
       ? this.logs
-      : this.activeCategory === 'ERRORS'
-      ? this.logs.filter((l) => l.level === 'error')
       : this.logs.filter((l) => l.category === this.activeCategory);
 
     for (const item of filtered) {
@@ -278,7 +246,7 @@ class DebugConsoleManager {
     if (!this.logsStreamEl) return;
 
     const row = document.createElement('div');
-    row.className = `dbg-log-row ${item.level === 'error' ? 'error-row' : item.level === 'warn' ? 'warn-row' : ''}`;
+    row.className = `dbg-log-row${item.level ? ` level-${item.level}` : ''}`;
 
     const timeSpan = document.createElement('span');
     timeSpan.className = 'dbg-log-time';

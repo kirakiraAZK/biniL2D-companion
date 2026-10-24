@@ -26,7 +26,9 @@ class FreshRssClient {
 
     const url = dbManager.getRuntimeSetting('freshrss_url', process.env.FRESHRSS_URL || '');
     const user = dbManager.getRuntimeSetting('freshrss_user', process.env.FRESHRSS_USER || '');
-    const password = dbManager.getRuntimeSetting('freshrss_api_password', process.env.FRESHRSS_API_PASSWORD || '');
+    const password =
+      dbManager.getRuntimeSetting('freshrss_password', '') ||
+      dbManager.getRuntimeSetting('freshrss_api_password', process.env.FRESHRSS_API_PASSWORD || '');
 
     if (!url || !password) {
       return null;

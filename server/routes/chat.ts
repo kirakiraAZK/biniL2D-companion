@@ -7,6 +7,9 @@ import { StreamTagParser } from '../parser/stream-tag-parser';
 import { ttsManager } from '../tts/tts-manager';
 import { moodService } from '../services/mood';
 import { weatherService } from '../services/weather';
+import { musicService, TrackInfo } from '../services/music';
+import { workConnectors } from '../connectors/work';
+import { freshRssClient } from '../connectors/freshrss';
 import { backgroundService } from '../services/background';
 import { classifyAIError } from '../ai/error-classifier';
 
@@ -50,7 +53,24 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
       } catch {}
     }
 
-    return reply.send(messages);
+    // GET messages for conversation
+    const mapped = messages.map((m) => {
+      let cards: any[] = [];
+      let music_track: any = null;
+      try {
+        if (m.cards_json) cards = JSON.parse(m.cards_json);
+      } catch {}
+      try {
+        if (m.music_track_json) music_track = JSON.parse(m.music_track_json);
+      } catch {}
+      return {
+        ...m,
+        cards,
+        music_track
+      };
+    });
+
+    return reply.send(mapped);
   });
 
   // DELETE messages / clear history
@@ -103,11 +123,13 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(result);
   });
 
-  // GET weather
-  app.get('/api/weather', async (_req, reply) => {
-    const data = await weatherService.fetchWeather();
+  // GET weather (supports optional ?city=... query for instant preview & test)
+  app.get('/api/weather', async (req, reply) => {
+    const { city } = (req.query as { city?: string }) || {};
+    const data = await weatherService.fetchWeather(city);
     return reply.send({
       enabled: dbManager.isFeatureEnabled('weather_enabled', false),
+      configuredCity: city || dbManager.getRuntimeSetting('weather_city', ''),
       data
     });
   });
@@ -202,7 +224,29 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
       .filter(m => m.id !== userMsg.id && (m.role === 'user' || m.role === 'assistant'))
       .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content, created_at: m.created_at }));
 
-    const promptMessages = buildConversationMessages(character, history, message);
+    // 1. Gather dynamic real-time weather context (if weather tool is enabled)
+    let weatherContext: string | null = null;
+    if (dbManager.isFeatureEnabled('weather_enabled', false)) {
+      try {
+        weatherContext = await weatherService.getWeatherPromptContext();
+      } catch (err: any) {
+        console.warn('[chat] Failed to fetch weather context:', err.message);
+      }
+    }
+
+    // 2. Gather dynamic work & external schedule context (Notion, Calendar, FreshRSS)
+    let connectorContext: string | null = null;
+    try {
+      const feedKeywords: string[] = JSON.parse(character.feed_keywords_json || '[]');
+      connectorContext = await workConnectors.getWorkAndConnectorContext(feedKeywords);
+    } catch (err: any) {
+      console.warn('[chat] Failed to fetch connector context:', err.message);
+    }
+
+    const promptMessages = buildConversationMessages(character, history, message, {
+      weatherContext,
+      connectorContext
+    });
 
     // Set up streaming response via SSE or Fastify reply
     reply.raw.setHeader('Content-Type', 'text/event-stream');
@@ -213,6 +257,38 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
     const sentencesForTTS: string[] = [];
     let firstSentenceSent = false;
     let firstAudioUrl: string | null = null;
+    let resolvedMusicTrack: TrackInfo | null = null;
+    const resolvedCards: Array<{ type: 'weather' | 'calendar' | 'tasks' | 'news'; data: any }> = [];
+
+    const emitCard = async (cardType: 'weather' | 'calendar' | 'tasks' | 'news', value?: string) => {
+      if (resolvedCards.some(c => c.type === cardType)) return;
+      try {
+        let cardData: any = null;
+        if (cardType === 'weather') {
+          cardData = await weatherService.fetchWeather(value || undefined);
+        } else if (cardType === 'calendar') {
+          cardData = await workConnectors.getUpcomingCalendarEvents();
+        } else if (cardType === 'tasks') {
+          cardData = await workConnectors.getNotionTasks();
+        } else if (cardType === 'news') {
+          const feedKeywords: string[] = JSON.parse(character.feed_keywords_json || '[]');
+          cardData = await freshRssClient.fetchArticles(feedKeywords);
+        }
+
+        if (cardData && (!Array.isArray(cardData) || cardData.length > 0 || cardType === 'calendar' || cardType === 'tasks')) {
+          resolvedCards.push({ type: cardType, data: cardData });
+          reply.raw.write(`data: ${JSON.stringify({ type: 'card', cardType, data: cardData })}\n\n`);
+          wsHub.broadcast({
+            type: 'chat_card',
+            cardType,
+            data: cardData,
+            character_id: character.id
+          });
+        }
+      } catch (err: any) {
+        console.warn(`[chat] Failed to resolve card "${cardType}":`, err.message);
+      }
+    };
 
     const parser = new StreamTagParser({
       onCleanToken: (token) => {
@@ -265,6 +341,22 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
             costume_id: resolvedSlug,
             name: matched ? matched.name : resolvedSlug
           });
+        } else if (tag.type === 'music') {
+          void musicService.resolveTrack(tag.value, character.display_name || character.name).then(track => {
+            if (track) {
+              resolvedMusicTrack = track;
+              reply.raw.write(`data: ${JSON.stringify({ type: 'music', track })}\n\n`);
+              wsHub.broadcast({
+                type: 'chat_music',
+                track,
+                character_id: character.id
+              });
+            }
+          }).catch(e => {
+            console.warn('[chat] Failed to resolve music tag in stream:', e.message);
+          });
+        } else if (tag.type === 'card' && tag.cardType) {
+          void emitCard(tag.cardType, tag.value);
         }
       },
       onSentenceComplete: (sentence) => {
@@ -309,10 +401,9 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
 
           if (firstAudioUrl) {
             wsHub.broadcast({
-              type: 'chat',
-              reply: result.cleanText,
-              emotion: result.emotion,
+              type: 'chat_audio',
               audio_url: firstAudioUrl,
+              emotion: result.emotion,
               character_id: character.id
             });
             reply.raw.write(`data: ${JSON.stringify({ type: 'audio', audio_url: firstAudioUrl })}\n\n`);
@@ -339,17 +430,62 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
           console.warn('[chat] TTS synthesis error:', ttsErr);
           wsHub.reportIssue('TTS', 'Voice synthesis failed', ttsErr, 'warn');
         }
-      } else {
-        // No TTS: broadcast reply without audio
-        wsHub.broadcast({
-          type: 'chat',
-          reply: result.cleanText,
-          emotion: result.emotion,
-          character_id: character.id
-        });
       }
 
-      // Save assistant message to database
+      // If music tag was captured during flush but not yet resolved
+      if (!resolvedMusicTrack && result.music) {
+        try {
+          resolvedMusicTrack = await musicService.resolveTrack(result.music, character.display_name || character.name);
+          if (resolvedMusicTrack) {
+            reply.raw.write(`data: ${JSON.stringify({ type: 'music', track: resolvedMusicTrack })}\n\n`);
+          }
+        } catch (e: any) {
+          console.warn('[chat] Failed to resolve music after flush:', e.message);
+        }
+      }
+
+      // If card tags were captured during flush
+      if (result.cards && result.cards.length > 0) {
+        for (const c of result.cards) {
+          await emitCard(c.type, c.value);
+        }
+      }
+
+      // Hybrid Fallback: If relevant questions were asked and features are enabled but tag was missed
+      const combinedLower = `${message} ${result.cleanText} ${result.rawText}`.toLowerCase();
+      if (
+        !resolvedCards.some((c) => c.type === 'weather') &&
+        dbManager.isFeatureEnabled('weather_enabled', false) &&
+        /\b(weather|temperature|forecast|rain|raining|rainy|cloudy|sunny|cuaca|hujan|suhu|derajat)\b/i.test(combinedLower)
+      ) {
+        await emitCard('weather');
+      }
+
+      if (
+        !resolvedCards.some((c) => c.type === 'calendar') &&
+        workConnectors.isCalendarEnabled() &&
+        /\b(calendar|schedule|meeting|agenda|events|appointment|jadwal|acara|rapat)\b/i.test(combinedLower)
+      ) {
+        await emitCard('calendar');
+      }
+
+      if (
+        !resolvedCards.some((c) => c.type === 'tasks') &&
+        workConnectors.isNotionEnabled() &&
+        /\b(tasks?|notion|todo|to-do|todos|tugas|kerjaan|pekerjaan)\b/i.test(combinedLower)
+      ) {
+        await emitCard('tasks');
+      }
+
+      if (
+        !resolvedCards.some((c) => c.type === 'news') &&
+        dbManager.isFeatureEnabled('freshrss_enabled', false) &&
+        /\b(news|headlines?|articles?|feed|rss|berita|kabar)\b/i.test(combinedLower)
+      ) {
+        await emitCard('news');
+      }
+
+      // Save assistant message to database with persisted cards and music
       const assistantMsg = dbManager.addMessage({
         conversation_id: conv.id,
         role: 'assistant',
@@ -362,13 +498,36 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
         expression: result.expression,
         motion: result.motion,
         costume: result.costume,
-        audio_url: firstAudioUrl
+        audio_url: firstAudioUrl,
+        cards_json: JSON.stringify(resolvedCards),
+        music_track_json: resolvedMusicTrack ? JSON.stringify(resolvedMusicTrack) : ''
       });
+
+      if (result.cleanText) {
+        // Broadcast complete reply to WebSocket clients (e.g. passive browser tabs or bridges)
+        wsHub.broadcast({
+          type: 'chat',
+          message_id: assistantMsg.id,
+          reply: result.cleanText,
+          emotion: result.emotion,
+          motion: result.motion,
+          costume: result.costume,
+          thought: result.thoughtText,
+          raw_content: result.rawText,
+          audio_url: firstAudioUrl,
+          cards: resolvedCards,
+          music_track: resolvedMusicTrack,
+          created_at: assistantMsg.created_at,
+          character_id: character.id
+        });
+      }
 
       reply.raw.write(`data: ${JSON.stringify({
         type: 'done',
         message: assistantMsg,
         thought: result.thoughtText,
+        music_track: resolvedMusicTrack,
+        cards: resolvedCards,
         debug: {
           raw_output: result.rawText,
           clean_text: result.cleanText,

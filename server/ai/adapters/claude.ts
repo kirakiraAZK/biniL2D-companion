@@ -24,36 +24,22 @@ export async function* streamClaude(
     .filter(m => m.role !== 'system')
     .map(m => ({ role: m.role, content: m.content }));
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
-
-  let response: Response;
-  try {
-    response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 3072,
-        system: systemMsg,
-        messages: conversation,
-        temperature,
-        stream: true,
-      }),
-      signal: controller.signal,
-    });
-  } catch (netErr: any) {
-    clearTimeout(timer);
-    if (netErr?.name === 'AbortError') {
-      throw new Error('Connection timed out after 30s connecting to Anthropic Claude API');
-    }
-    throw netErr;
-  }
-  clearTimeout(timer);
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      system: systemMsg,
+      messages: conversation,
+      temperature,
+      stream: true,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');

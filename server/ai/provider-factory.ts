@@ -3,8 +3,12 @@ import { PromptMessage } from './prompt-builder';
 import { streamOpenAI } from './adapters/openai';
 import { streamClaude } from './adapters/claude';
 import { streamGemini } from './adapters/gemini';
-import { wsHub } from '../ws/ws-hub';
-import { classifyAIError } from './error-classifier';
+
+import { CharacterRow, dbManager } from '../db/client';
+import { PromptMessage } from './prompt-builder';
+import { streamOpenAI } from './adapters/openai';
+import { streamClaude } from './adapters/claude';
+import { streamGemini } from './adapters/gemini';
 
 function getProviderStream(
   providerName: string,
@@ -72,27 +76,16 @@ export async function* streamAI(
       return; // Stream succeeded
     } catch (err: any) {
       lastError = err;
-      const classified = classifyAIError(err, undefined, currentProvider);
-      console.warn(`[ai-provider] Provider '${currentProvider}' failed:`, classified.title, err.message || err);
-
+      console.warn(`[ai-provider] Provider '${currentProvider}' failed:`, err.message || err);
       // If we already yielded tokens to the client, we cannot seamlessly fallback mid-stream
       if (yieldedAny) {
         throw err;
       }
-
       if (i < chain.length - 1) {
-        const nextProvider = chain[i + 1];
-        wsHub.log(
-          'AI',
-          `Primary provider '${currentProvider}' failed — falling back to '${nextProvider}'`,
-          { error: classified.message, hint: classified.hint },
-          'warn'
-        );
+        console.log(`[ai-provider] Attempting fallback to '${chain[i + 1]}'`);
       }
     }
   }
 
-  const finalClassified = classifyAIError(lastError, undefined, primary);
-  wsHub.log('AI', `All configured AI providers failed: ${finalClassified.title}`, finalClassified, 'error');
   throw lastError || new Error('All AI providers failed');
 }

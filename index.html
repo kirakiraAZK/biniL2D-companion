@@ -241,6 +241,48 @@
         gap: 6px;
       }
 
+      .msg-time {
+        font-size: 10px;
+        font-weight: 500;
+        color: #94a3b8;
+        opacity: 0.85;
+        white-space: nowrap;
+        margin-left: 2px;
+      }
+
+      .msg-row.user .msg-time {
+        color: #cbd5e1;
+      }
+
+      /* Chat Date Separator */
+      .chat-date-separator {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        margin: 14px 0 10px 0;
+        gap: 12px;
+        user-select: none;
+      }
+
+      .date-sep-line {
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.02) 100%);
+      }
+
+      .date-sep-pill {
+        font-size: 10.5px;
+        font-weight: 600;
+        color: #94a3b8;
+        background: rgba(18, 22, 40, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 3px 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+      }
+
       .tag-pill {
         font-size: 10px;
         font-weight: 600;
@@ -1173,6 +1215,416 @@
         to { opacity: 1; transform: translateY(0); }
       }
 
+      /* === IN-CHAT INTERACTIVE MUSIC PLAYER CARD === */
+      .chat-music-card {
+        margin-top: 10px;
+        background: linear-gradient(135deg, rgba(28, 25, 68, 0.92) 0%, rgba(13, 17, 33, 0.96) 100%);
+        border: 1.5px solid rgba(139, 92, 246, 0.45);
+        border-radius: 14px;
+        padding: 12px 14px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        animation: fadeIn 0.2s ease-out;
+      }
+      .music-card-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .music-card-art {
+        width: 52px;
+        height: 52px;
+        border-radius: 8px;
+        object-fit: cover;
+        background: rgba(99, 102, 241, 0.2);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        flex-shrink: 0;
+      }
+      .music-card-art-fallback {
+        width: 52px;
+        height: 52px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+      .music-card-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .music-card-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #f1f5f9;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.3;
+      }
+      .music-card-artist {
+        font-size: 12px;
+        color: #c4b5fd;
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .music-card-album {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 1px;
+      }
+      .music-audio-player {
+        width: 100%;
+        height: 32px;
+        border-radius: 8px;
+        outline: none;
+      }
+      .music-streaming-pills {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .music-pill-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-right: 2px;
+      }
+      .music-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11.5px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: transform 0.15s, filter 0.15s, background 0.15s;
+        cursor: pointer;
+      }
+      .music-pill:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.15);
+      }
+      .music-pill.spotify {
+        background: rgba(30, 215, 96, 0.18);
+        border: 1px solid rgba(30, 215, 96, 0.45);
+        color: #1ed760;
+      }
+      .music-pill.yt-music {
+        background: rgba(255, 0, 0, 0.18);
+        border: 1px solid rgba(255, 0, 0, 0.45);
+        color: #ff4e4e;
+      }
+      .music-pill.apple-music {
+        background: rgba(250, 44, 85, 0.18);
+        border: 1px solid rgba(250, 44, 85, 0.45);
+        color: #fa2c55;
+      }
+      .music-pill.youtube {
+        background: rgba(239, 68, 68, 0.16);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: #f87171;
+      }
+
+      /* Rich Chat Cards: Shared Base */
+      .chat-rich-card {
+        margin-top: 10px;
+        border-radius: 14px;
+        padding: 12px 14px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        animation: fadeIn 0.2s ease-out;
+      }
+      .rich-card-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .rich-card-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #f1f5f9;
+      }
+      .rich-card-badge {
+        font-size: 10.5px;
+        padding: 2px 7px;
+        border-radius: 10px;
+        font-weight: 600;
+      }
+
+      /* 1. Weather Card */
+      .chat-weather-card {
+        background: linear-gradient(135deg, rgba(15, 32, 67, 0.95) 0%, rgba(13, 22, 48, 0.98) 100%);
+        border: 1.5px solid rgba(56, 189, 248, 0.45);
+      }
+      .weather-main-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .weather-icon-box {
+        font-size: 38px;
+        line-height: 1;
+        filter: drop-shadow(0 2px 8px rgba(56, 189, 248, 0.4));
+      }
+      .weather-info-box {
+        flex: 1;
+        min-width: 0;
+      }
+      .weather-temp-row {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .weather-temp {
+        font-size: 26px;
+        font-weight: 800;
+        color: #f8fafc;
+        line-height: 1.1;
+      }
+      .weather-feels {
+        font-size: 11.5px;
+        color: #94a3b8;
+      }
+      .weather-condition {
+        font-size: 13px;
+        font-weight: 600;
+        color: #38bdf8;
+        margin-top: 2px;
+      }
+      .weather-location {
+        font-size: 11px;
+        color: #cbd5e1;
+        margin-top: 1px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .weather-metrics-strip {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .weather-metric-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 9px;
+        background: rgba(56, 189, 248, 0.12);
+        border: 1px solid rgba(56, 189, 248, 0.25);
+        border-radius: 12px;
+        font-size: 11px;
+        color: #bae6fd;
+        font-weight: 500;
+      }
+      .weather-forecast-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+        gap: 6px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .weather-forecast-day {
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 8px;
+        padding: 6px 4px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+      }
+      .forecast-date {
+        font-size: 10px;
+        font-weight: 600;
+        color: #94a3b8;
+      }
+      .forecast-icon {
+        font-size: 16px;
+      }
+      .forecast-temp {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: #f1f5f9;
+      }
+      .forecast-rain {
+        font-size: 9.5px;
+        color: #67e8f9;
+      }
+
+      /* 2. Calendar Schedule Card */
+      .chat-calendar-card {
+        background: linear-gradient(135deg, rgba(28, 22, 60, 0.95) 0%, rgba(18, 14, 40, 0.98) 100%);
+        border: 1.5px solid rgba(168, 85, 247, 0.45);
+      }
+      .calendar-events-list {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .calendar-event-item {
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(168, 85, 247, 0.25);
+        border-radius: 9px;
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        transition: transform 0.15s;
+      }
+      .calendar-event-item:hover {
+        transform: translateX(2px);
+        background: rgba(168, 85, 247, 0.12);
+      }
+      .calendar-time-badge {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: #d8b4fe;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .calendar-event-title {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #f8fafc;
+        line-height: 1.25;
+      }
+      .calendar-event-location {
+        font-size: 11px;
+        color: #c084fc;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .calendar-empty-note {
+        font-size: 11.5px;
+        color: #94a3b8;
+        font-style: italic;
+        padding: 4px 0;
+      }
+
+      /* 3. Notion Tasks Card */
+      .chat-tasks-card {
+        background: linear-gradient(135deg, rgba(18, 30, 42, 0.95) 0%, rgba(12, 20, 30, 0.98) 100%);
+        border: 1.5px solid rgba(52, 211, 153, 0.45);
+      }
+      .tasks-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .task-item-row {
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(52, 211, 153, 0.22);
+        border-radius: 8px;
+        padding: 7px 10px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .task-status-pill {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 6px;
+        white-space: nowrap;
+        text-transform: capitalize;
+      }
+      .task-status-pill.done {
+        background: rgba(16, 185, 129, 0.22);
+        border: 1px solid rgba(16, 185, 129, 0.5);
+        color: #6ee7b7;
+      }
+      .task-status-pill.in-progress {
+        background: rgba(245, 158, 11, 0.2);
+        border: 1px solid rgba(245, 158, 11, 0.5);
+        color: #fcd34d;
+      }
+      .task-status-pill.todo {
+        background: rgba(148, 163, 184, 0.15);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        color: #cbd5e1;
+      }
+      .task-title-text {
+        font-size: 12px;
+        font-weight: 600;
+        color: #f1f5f9;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* 4. FreshRSS News Card */
+      .chat-news-card {
+        background: linear-gradient(135deg, rgba(38, 20, 24, 0.95) 0%, rgba(22, 13, 18, 0.98) 100%);
+        border: 1.5px solid rgba(251, 113, 133, 0.45);
+      }
+      .news-articles-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .news-article-link {
+        background: rgba(0, 0, 0, 0.28);
+        border: 1px solid rgba(251, 113, 133, 0.25);
+        border-radius: 8px;
+        padding: 7px 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        text-decoration: none;
+        color: inherit;
+        transition: transform 0.15s, background 0.15s;
+        cursor: pointer;
+      }
+      .news-article-link:hover {
+        transform: translateX(2px);
+        background: rgba(251, 113, 133, 0.15);
+      }
+      .news-article-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #ffe4e6;
+        line-height: 1.3;
+        flex: 1;
+      }
+      .news-source-pill {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 6px;
+        background: rgba(251, 113, 133, 0.2);
+        border: 1px solid rgba(251, 113, 133, 0.4);
+        border-radius: 6px;
+        color: #fda4af;
+        white-space: nowrap;
+      }
+
       .tag-pill.raw-btn {
         background: rgba(14, 165, 233, 0.15);
         color: #38bdf8;
@@ -1789,7 +2241,11 @@
 
             <div class="settings-group" style="margin-top: 12px;">
               <label for="setting-weather-city">Weather City / Location</label>
-              <input type="text" id="setting-weather-city" placeholder="e.g. Jakarta, Tokyo, London" />
+              <div class="input-with-action">
+                <input type="text" id="setting-weather-city" placeholder="e.g. Jakarta, Tokyo, London, New York" />
+                <button type="button" class="btn-secondary" id="btn-test-weather" title="Preview weather for this city">🌤️ Test</button>
+              </div>
+              <div id="weather-test-status" style="display: none; margin-top: 6px; font-size: 12px; line-height: 1.4; padding: 6px 10px; border-radius: 6px; word-break: break-word;"></div>
             </div>
 
             <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
@@ -1803,43 +2259,49 @@
                 <input type="checkbox" id="setting-stt-enabled" />
               </label>
 
+              <!-- FreshRSS Connector -->
               <label class="switch-label" style="margin-top: 14px;">
                 <div>
                   <strong style="font-size: 13.5px; display: block;">FreshRSS News Feed</strong>
-                  <span style="font-size: 12px; color: var(--text-muted);">Fetches news matching character feed keywords for idle thoughts</span>
+                  <span style="font-size: 12px; color: var(--text-muted);">Fetches news matching character feed keywords for idle thoughts & chat</span>
                 </div>
                 <input type="checkbox" id="setting-freshrss-enabled" />
               </label>
               <div class="settings-group" style="margin-top: 8px;">
                 <input type="text" id="setting-freshrss-url" placeholder="FreshRSS URL (e.g. http://localhost:8080)" />
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+                  <input type="text" id="setting-freshrss-user" placeholder="Username (optional for public feeds)" />
+                  <input type="password" id="setting-freshrss-password" placeholder="API Password (under Profile > API)" />
+                </div>
               </div>
 
+              <!-- Notion Connector -->
               <label class="switch-label" style="margin-top: 14px;">
                 <div>
                   <strong style="font-size: 13.5px; display: block;">Notion Workspace Tasks</strong>
-                  <span style="font-size: 12px; color: var(--text-muted);">Syncs tasks & notes from connected Notion databases</span>
+                  <span style="font-size: 12px; color: var(--text-muted);">Syncs pending tasks & notes from connected Notion database into companion context</span>
                 </div>
                 <input type="checkbox" id="setting-notion-enabled" />
               </label>
               <div class="settings-group" style="margin-top: 8px;">
-                <input type="password" id="setting-notion-api-key" placeholder="Notion API Key (secret_...)" />
+                <input type="password" id="setting-notion-api-key" placeholder="Notion Internal Integration Secret (secret_...)" />
+                <input type="text" id="setting-notion-database-id" placeholder="Database ID (32-character hex from database page URL)" style="margin-top: 6px;" />
               </div>
 
+              <!-- Universal Calendar / Schedule (Google Calendar, Nextcloud, iCloud, Outlook) -->
               <label class="switch-label" style="margin-top: 14px;">
                 <div>
-                  <strong style="font-size: 13.5px; display: block;">Google Suite / Calendar</strong>
-                  <span style="font-size: 12px; color: var(--text-muted);">Checks unread emails and upcoming calendar reminders</span>
+                  <strong style="font-size: 13.5px; display: block;">Calendar & Schedule Sync</strong>
+                  <span style="font-size: 12px; color: var(--text-muted);">Syncs upcoming events & reminders into companion context via iCal / .ics feed</span>
                 </div>
-                <input type="checkbox" id="setting-google-enabled" />
+                <input type="checkbox" id="setting-calendar-enabled" />
               </label>
-
-              <label class="switch-label" style="margin-top: 14px;">
-                <div>
-                  <strong style="font-size: 13.5px; display: block;">Nextcloud CalDAV</strong>
-                  <span style="font-size: 12px; color: var(--text-muted);">Syncs reminders from personal CalDAV calendar</span>
-                </div>
-                <input type="checkbox" id="setting-nextcloud-enabled" />
-              </label>
+              <div class="settings-group" style="margin-top: 8px;">
+                <input type="text" id="setting-calendar-ics-url" placeholder="Calendar iCal (.ics) Feed URL (Google Secret Address, Nextcloud, iCloud)" />
+                <p style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.45;">
+                  💡 <strong>Google Calendar Tip:</strong> Go to Google Calendar Settings &gt; Integrate Calendar &gt; Copy <em>"Secret address in iCal format"</em>. Works automatically without OAuth setup.
+                </p>
+              </div>
             </div>
           </div>
 

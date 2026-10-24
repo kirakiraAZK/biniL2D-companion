@@ -75,11 +75,14 @@ export interface MessageRow {
   character_name?: string | null;
   content: string;
   raw_content: string;
+  thought?: string | null;
   emotion?: string | null;
   expression?: string | null;
   motion?: string | null;
   costume?: string | null;
   audio_url?: string | null;
+  cards_json?: string | null;
+  music_track_json?: string | null;
   created_at: number;
 }
 
@@ -172,6 +175,8 @@ class DatabaseManager {
         motion TEXT,
         costume TEXT,
         audio_url TEXT,
+        cards_json TEXT DEFAULT '[]',
+        music_track_json TEXT DEFAULT '',
         created_at INTEGER NOT NULL,
         FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
       );
@@ -199,9 +204,15 @@ class DatabaseManager {
       );
     `);
 
-    // Ensure thought column exists for backwards compatibility
+    // Ensure thought, cards_json, and music_track_json columns exist for backwards compatibility
     try {
       this.db.exec('ALTER TABLE messages ADD COLUMN thought TEXT;');
+    } catch {}
+    try {
+      this.db.exec("ALTER TABLE messages ADD COLUMN cards_json TEXT DEFAULT '[]';");
+    } catch {}
+    try {
+      this.db.exec("ALTER TABLE messages ADD COLUMN music_track_json TEXT DEFAULT '';");
     } catch {}
 
     // Character Card & Avatar-Server Column Migrations
@@ -418,18 +429,21 @@ class DatabaseManager {
     this.db.prepare(`
       INSERT INTO messages (
         id, conversation_id, role, character_id, character_name, content, raw_content,
-        thought, emotion, expression, motion, costume, audio_url, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        thought, emotion, expression, motion, costume, audio_url, cards_json, music_track_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, msg.conversation_id, msg.role, msg.character_id ?? null, msg.character_name ?? null,
       msg.content, msg.raw_content ?? msg.content, msg.thought ?? null, msg.emotion ?? null, msg.expression ?? null,
-      msg.motion ?? null, msg.costume ?? null, msg.audio_url ?? null, now
+      msg.motion ?? null, msg.costume ?? null, msg.audio_url ?? null,
+      msg.cards_json ?? '[]', msg.music_track_json ?? '', now
     );
 
     this.db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, msg.conversation_id);
 
     return {
       ...msg,
+      cards_json: msg.cards_json ?? '[]',
+      music_track_json: msg.music_track_json ?? '',
       id,
       created_at: now
     };
