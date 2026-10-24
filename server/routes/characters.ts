@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { dbManager } from '../db/client';
 import { wsHub } from '../ws/ws-hub';
+import { musicService } from '../services/music';
 
 export async function registerCharacterRoutes(app: FastifyInstance): Promise<void> {
   // GET all characters with costumes
@@ -124,5 +125,83 @@ export async function registerCharacterRoutes(app: FastifyInstance): Promise<voi
       display_name: newName
     });
     return reply.send({ ok: true, id, display_name: newName });
+  });
+
+  // GET /api/music/search — Search songs from public music database (iTunes / MusicBrainz)
+  app.get('/api/music/search', async (req, reply) => {
+    const { artist, limit } = req.query as { artist?: string; limit?: string };
+    const query = (artist || '').trim();
+    if (!query) {
+      return reply.status(400).send({ error: 'Artist query parameter is required' });
+    }
+    const maxLimit = Math.min(100, Math.max(5, parseInt(limit || '50', 10) || 50));
+    const tracks = await musicService.searchSongs(query, maxLimit);
+    return reply.send({ ok: true, artist: query, count: tracks.length, tracks });
+  });
+
+  // POST /api/characters/:id/sync-songs — Auto-sync songs from music database into character profile
+  app.post('/api/characters/:id/sync-songs', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { artistQuery, append = true } = (req.body as { artistQuery?: string; append?: boolean }) || {};
+
+    const char = dbManager.getCharacter(id);
+    if (!char) return reply.status(404).send({ error: 'Character not found' });
+
+    const query = (artistQuery || char.display_name || char.name || '').trim();
+    if (!query) return reply.status(400).send({ error: 'No artist name available to search' });
+
+    const tracks = await musicService.searchSongs(query, 50);
+    const fetchedTitles = tracks.map(t => t.title);
+
+    let existingSongs: string[] = [];
+    try {
+      existingSongs = JSON.parse(char.songs_json || '[]');
+    } catch {}
+
+    const seen = new Set<string>();
+    const mergedSongs: string[] = [];
+
+    // If append is true, preserve existing songs first
+    if (append) {
+      for (const s of existingSongs) {
+        const k = s.toLowerCase().trim();
+        if (k && !seen.has(k)) {
+          seen.add(k);
+          mergedSongs.push(s);
+        }
+      }
+    }
+
+    let addedCount = 0;
+    for (const title of fetchedTitles) {
+      const k = title.toLowerCase().trim();
+      if (k && !seen.has(k)) {
+        seen.add(k);
+        mergedSongs.push(title);
+        addedCount++;
+      }
+    }
+
+    dbManager.upsertCharacter({
+      ...char,
+      songs_json: JSON.stringify(mergedSongs),
+      id
+    });
+
+    wsHub.broadcast({
+      type: 'songs_synced',
+      character_id: id,
+      count: mergedSongs.length,
+      songs: mergedSongs
+    });
+
+    return reply.send({
+      ok: true,
+      characterId: id,
+      artistSearched: query,
+      addedCount,
+      totalCount: mergedSongs.length,
+      songs: mergedSongs
+    });
   });
 }

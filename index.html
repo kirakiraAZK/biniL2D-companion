@@ -1264,7 +1264,10 @@
     <div id="settings-modal">
       <div class="modal-card">
         <div class="modal-header">
-          <h3>Companion Settings</h3>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <h3>Companion Settings</h3>
+            <span id="settings-active-character-pill" class="tag-pill" style="font-size: 11.5px; background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;">Active Companion</span>
+          </div>
           <button class="icon-btn" id="btn-close-settings">✕</button>
         </div>
 
@@ -1442,20 +1445,29 @@
               <textarea id="setting-char-examples" rows="3" placeholder='[{"role": "user", "content": "Hi!"}, {"role": "assistant", "content": "[HAPPY] Hey! What&#39;s up?"}]'></textarea>
             </div>
 
-            <div class="settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-              <div class="settings-group">
-                <label for="setting-char-feed-keywords">News & RSS Feed Keywords</label>
-                <input type="text" id="setting-char-feed-keywords" placeholder="e.g. technology, space, gaming" />
+            <div class="settings-group">
+              <label for="setting-char-feed-keywords">News & RSS Feed Keywords</label>
+              <input type="text" id="setting-char-feed-keywords" placeholder="e.g. technology, space, gaming" />
+            </div>
+
+            <!-- Music & Discography Section with Database Auto-Sync -->
+            <div class="settings-group">
+              <label for="setting-char-songs">
+                <span>Songs Repertoire & Discography</span>
+                <span id="setting-song-count" class="tag-pill" style="font-size: 11px;">0 songs</span>
+              </label>
+              <div class="input-with-action" style="margin-bottom: 8px;">
+                <input type="text" id="setting-music-artist" placeholder="Search artist name in music database..." title="Artist query for music database" />
+                <button type="button" class="btn-mini-action" id="btn-fetch-songs" style="white-space: nowrap; padding: 0 14px;">🎵 Auto-Fetch Songs</button>
               </div>
-              <div class="settings-group">
-                <label for="setting-char-songs">Songs Repertoire (comma-separated)</label>
-                <input type="text" id="setting-char-songs" placeholder="e.g. Song 1, Song 2" />
-              </div>
+              <textarea id="setting-char-songs" rows="3" placeholder="Song titles, comma-separated or one per line (e.g. Palette, Fact, My Roar, Shirube...)" title="Songs known or sung by this companion"></textarea>
             </div>
 
             <div class="settings-group">
-              <label for="setting-char-song-aliases">Song Aliases (JSON Key-Value)</label>
-              <input type="text" id="setting-char-song-aliases" placeholder='{"alias": "actual song title"}' />
+              <label for="setting-char-song-aliases">
+                <span>Song Aliases <span style="font-size: 11px; font-weight: 400; color: var(--text-muted);">(Optional)</span></span>
+              </label>
+              <input type="text" id="setting-char-song-aliases" placeholder='Optional JSON mappings, e.g. {"error": "ERROR - Tokoyami Towa"}' />
             </div>
 
             <div class="settings-group">

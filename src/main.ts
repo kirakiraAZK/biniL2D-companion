@@ -97,9 +97,13 @@ const settingCharScenario = document.getElementById('setting-char-scenario') as 
 const settingCharFirstMessage = document.getElementById('setting-char-first-message') as HTMLInputElement;
 const settingCharExamples = document.getElementById('setting-char-examples') as HTMLTextAreaElement;
 const settingCharFeedKeywords = document.getElementById('setting-char-feed-keywords') as HTMLInputElement;
-const settingCharSongs = document.getElementById('setting-char-songs') as HTMLInputElement;
+const settingMusicArtist = document.getElementById('setting-music-artist') as HTMLInputElement;
+const btnFetchSongs = document.getElementById('btn-fetch-songs') as HTMLButtonElement;
+const settingSongCount = document.getElementById('setting-song-count') as HTMLElement;
+const settingCharSongs = document.getElementById('setting-char-songs') as HTMLTextAreaElement;
 const settingCharSongAliases = document.getElementById('setting-char-song-aliases') as HTMLInputElement;
 const settingCharSystemPrompt = document.getElementById('setting-char-system-prompt') as HTMLTextAreaElement;
+const settingsActiveCharacterPill = document.getElementById('settings-active-character-pill') as HTMLElement;
 
 // Badges & STT
 const companionMoodBadge = document.getElementById('companion-mood-badge') as HTMLElement;
@@ -443,7 +447,8 @@ async function main() {
   // Setup UI Events & Tabbed Settings
   setupUI(
     characters,
-    currentCharacter,
+    () => currentCharacter,
+    () => currentCostume,
     switchCharacter,
     switchCostume,
     triggerEmotion,
@@ -959,8 +964,9 @@ function appendMessageBubble(
 
 // Main UI Event Binder
 function setupUI(
-  _characters: Character[],
-  getCurrentChar: Character,
+  characters: Character[],
+  getCurrentChar: () => Character,
+  getCurrentCostume: () => Costume,
   onSwitchChar: (id: string) => Promise<void>,
   onSwitchCostume: (id: string) => Promise<void>,
   onEmotion: (e: string) => void,
@@ -969,7 +975,7 @@ function setupUI(
   getModel: () => CompanionModel,
   _getCharId: () => string
 ) {
-  let currentChar = getCurrentChar;
+  const getCurChar = () => getCurrentChar();
 
   // Dropdown changes
   selectCharacter?.addEventListener('change', () => {
@@ -1011,7 +1017,7 @@ function setupUI(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          characterId: selectCharacter?.value || currentChar.id,
+          characterId: selectCharacter?.value || getCurChar().id,
           message: text,
           conversationId: activeConversationId
         })
@@ -1366,7 +1372,7 @@ function setupUI(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            characterId: selectCharacter?.value || currentChar.id,
+            characterId: selectCharacter?.value || getCurChar().id,
             filename: file.name,
             base64Data
           })
@@ -1389,145 +1395,145 @@ function setupUI(
   };
 
   // Settings Modal Handlers
+  const updateSongCountBadge = (count: number) => {
+    if (settingSongCount) {
+      settingSongCount.textContent = `${count} song${count === 1 ? '' : 's'}`;
+    }
+  };
+
+  settingCharSongs?.addEventListener('input', () => {
+    const list = settingCharSongs.value.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+    updateSongCountBadge(list.length);
+  });
+
   const openSettings = async () => {
+    const cur = getCurChar();
+
+    if (settingsActiveCharacterPill) {
+      settingsActiveCharacterPill.textContent = cur.displayName || cur.name;
+    }
+
     try {
       const res = await fetch('/api/settings');
-      if (res.ok) {
-        const s = await res.json();
-        if (s.ai_provider) settingProvider.value = s.ai_provider;
-        if (s.openai_base_url) settingBaseUrl.value = s.openai_base_url;
-        if (s.openai_api_key) settingApiKey.value = s.openai_api_key;
-        if (s.openai_model) settingModel.value = s.openai_model;
-        if (s.temperature) {
-          settingTemperature.value = s.temperature;
-          if (tempDisplay) tempDisplay.textContent = s.temperature;
-        }
+      const s = res.ok ? await res.json() : {};
 
-        if (s.tts_master_enabled !== undefined) {
-          settingTtsMaster.checked = s.tts_master_enabled !== 'false';
-        }
-        if (s.tts_engine) settingTtsEngine.value = s.tts_engine;
-        if (s.omnivoice_api_url) settingOmniVoiceUrl.value = s.omnivoice_api_url;
-        if (s.tts_allow_fallback !== undefined) {
-          settingTtsFallback.checked = s.tts_allow_fallback !== 'false';
-        }
-        if (s.edge_voice) settingEdgeVoice.value = s.edge_voice;
+      // 1. Fetch character-specific row from /api/characters/:id
+      let c: any = null;
+      try {
+        const charRes = await fetch(`/api/characters/${encodeURIComponent(cur.id)}`);
+        if (charRes.ok) c = await charRes.json();
+      } catch {}
 
-        if (s.custom_voice_name && activeVoicePreview && activeVoiceName) {
-          activeVoicePreview.style.display = 'block';
-          activeVoiceName.textContent = s.custom_voice_name;
-        }
-
-        if (s.telegram_bot_enabled !== undefined) {
-          settingTelegramEnabled.checked = s.telegram_bot_enabled === 'true';
-        }
-        if (s.telegram_bot_token) settingTelegramToken.value = s.telegram_bot_token;
-        if (s.telegram_allowed_id) settingTelegramAllowed.value = s.telegram_allowed_id;
-
-        if (s.discord_bot_enabled !== undefined) {
-          settingDiscordEnabled.checked = s.discord_bot_enabled === 'true';
-        }
-        if (s.discord_bot_token) settingDiscordToken.value = s.discord_bot_token;
-        if (s.discord_channel_id) settingDiscordChannel.value = s.discord_channel_id;
-        if (s.discord_allowed_id) settingDiscordAllowed.value = s.discord_allowed_id;
-
-        if (settingCharName) settingCharName.value = currentChar.displayName || currentChar.name || '';
-        if (s.owner_name && settingOwnerName) settingOwnerName.value = s.owner_name;
-        if (s.owner_pronoun && settingOwnerPronoun) settingOwnerPronoun.value = s.owner_pronoun;
-        if (s.timezone && settingTimezone) settingTimezone.value = s.timezone;
-        if (s.tz_label && settingTzLabel) settingTzLabel.value = s.tz_label;
-        if (s.personality && settingPersonality) settingPersonality.value = s.personality;
-
-        if (s.timezone_enabled !== undefined && settingTimezoneEnabled) {
-          settingTimezoneEnabled.checked = s.timezone_enabled !== 'false';
-        }
-        if (s.touch_enabled !== undefined && settingTouchEnabled) {
-          settingTouchEnabled.checked = s.touch_enabled !== 'false';
-        }
-        if (s.mood_enabled !== undefined && settingMoodEnabled) {
-          settingMoodEnabled.checked = s.mood_enabled !== 'false';
-        } else if (settingMoodEnabled) {
-          settingMoodEnabled.checked = true;
-        }
-        if (s.idle_talk_enabled !== undefined && settingIdleTalkEnabled) {
-          settingIdleTalkEnabled.checked = s.idle_talk_enabled === 'true';
-        }
-        if (s.sleep_cycle_enabled !== undefined && settingSleepCycleEnabled) {
-          settingSleepCycleEnabled.checked = s.sleep_cycle_enabled === 'true';
-        }
-        if (s.weather_enabled !== undefined && settingWeatherEnabled) {
-          settingWeatherEnabled.checked = s.weather_enabled === 'true';
-        }
-        if (s.weather_city && settingWeatherCity) {
-          settingWeatherCity.value = s.weather_city;
-        }
-
-        if (s.llm_fallback_1 && settingLlmFallback1) settingLlmFallback1.value = s.llm_fallback_1;
-        if (s.llm_fallback_2 && settingLlmFallback2) settingLlmFallback2.value = s.llm_fallback_2;
-        if (s.stt_enabled !== undefined && settingSttEnabled) {
-          settingSttEnabled.checked = s.stt_enabled === 'true';
-          if (sttBtn) sttBtn.style.display = settingSttEnabled.checked ? 'flex' : 'none';
-        }
-        if (s.freshrss_enabled !== undefined && settingFreshrssEnabled) {
-          settingFreshrssEnabled.checked = s.freshrss_enabled === 'true';
-        }
-        if (s.freshrss_url && settingFreshrssUrl) settingFreshrssUrl.value = s.freshrss_url;
-        if (s.notion_enabled !== undefined && settingNotionEnabled) {
-          settingNotionEnabled.checked = s.notion_enabled === 'true';
-        }
-        if (s.notion_api_key && settingNotionApiKey) settingNotionApiKey.value = s.notion_api_key;
-        if (s.google_enabled !== undefined && settingGoogleEnabled) {
-          settingGoogleEnabled.checked = s.google_enabled === 'true';
-        }
-        if (s.nextcloud_enabled !== undefined && settingNextcloudEnabled) {
-          settingNextcloudEnabled.checked = s.nextcloud_enabled === 'true';
-        }
-
-        if (settingDebugMode) {
-          settingDebugMode.checked = debugManager.isDebugMode;
-        }
-
-        // Load full character profile fields from /api/characters/:id
-        try {
-          const charRes = await fetch(`/api/characters/${encodeURIComponent(currentChar.id)}`);
-          if (charRes.ok) {
-            const c = await charRes.json();
-            if (settingCharName) settingCharName.value = c.display_name || c.name || '';
-            if (settingCharNicknames) settingCharNicknames.value = Array.isArray(c.nicknames) ? c.nicknames.join(', ') : '';
-            if (settingCharTags) settingCharTags.value = Array.isArray(c.tags) ? c.tags.join(', ') : '';
-            if (settingOwnerName) settingOwnerName.value = c.owner?.name || s.owner_name || 'User';
-            if (settingOwnerPronoun) settingOwnerPronoun.value = c.owner?.pronoun || s.owner_pronoun || 'they';
-            if (settingTimezone) settingTimezone.value = c.timezone || s.timezone || '';
-            if (settingTzLabel) settingTzLabel.value = c.tz_label || s.tz_label || '';
-            if (settingCharLanguage) settingCharLanguage.value = c.language || 'en';
-            if (settingCharCountry) settingCharCountry.value = c.country || '';
-            if (settingCharDescription) settingCharDescription.value = c.description || '';
-            if (settingPersonality) settingPersonality.value = c.personality || s.personality || '';
-            if (settingCharScenario) settingCharScenario.value = c.scenario || '';
-            if (settingCharFirstMessage) settingCharFirstMessage.value = c.first_message || '';
-            if (settingCharExamples) settingCharExamples.value = Array.isArray(c.example_messages) && c.example_messages.length ? JSON.stringify(c.example_messages, null, 2) : '';
-            if (settingCharFeedKeywords) settingCharFeedKeywords.value = Array.isArray(c.feed_keywords) ? c.feed_keywords.join(', ') : '';
-            if (settingCharSongs) settingCharSongs.value = Array.isArray(c.songs) ? c.songs.join(', ') : '';
-            if (settingCharSongAliases) settingCharSongAliases.value = c.song_aliases && Object.keys(c.song_aliases).length ? JSON.stringify(c.song_aliases) : '';
-            if (settingCharSystemPrompt) settingCharSystemPrompt.value = c.system_prompt || '';
-          }
-        } catch {}
-
-        // Load current live mood score
-        try {
-          const moodRes = await fetch(`/api/characters/${encodeURIComponent(currentChar.id)}/mood`);
-          if (moodRes.ok) {
-            const m = await moodRes.json();
-            updateMoodBadge(m.score, m.bracket);
-          }
-        } catch {}
+      // AI Brain tab (per-character preference with global fallback)
+      if (settingProvider) settingProvider.value = c?.ai_provider || s.ai_provider || 'openai';
+      if (settingBaseUrl) settingBaseUrl.value = c?.custom_base_url || s.openai_base_url || '';
+      if (settingApiKey) settingApiKey.value = s[`${(c?.ai_provider || s.ai_provider || 'openai').toLowerCase()}_api_key`] || s.openai_api_key || '';
+      if (settingModel) settingModel.value = c?.ai_model || s.openai_model || '';
+      if (settingTemperature) {
+        const temp = c?.temperature !== undefined ? c.temperature : (s.temperature || 0.75);
+        settingTemperature.value = String(temp);
+        if (tempDisplay) tempDisplay.textContent = String(temp);
       }
-    } catch {}
+
+      // Voice & TTS tab (per-character preference with global fallback)
+      if (settingTtsMaster) {
+        settingTtsMaster.checked = s.tts_master_enabled !== 'false';
+      }
+      if (settingTtsEngine) settingTtsEngine.value = c?.tts_engine || s.tts_engine || 'omnivoice';
+      if (settingOmniVoiceUrl) settingOmniVoiceUrl.value = s.omnivoice_api_url || 'http://localhost:9192';
+      if (settingTtsFallback) {
+        settingTtsFallback.checked = s.tts_allow_fallback !== 'false';
+      }
+      if (settingEdgeVoice) settingEdgeVoice.value = c?.tts_voice || s.edge_voice || 'ja-JP-NanamiNeural';
+
+      const customVoiceRef = c?.tts_voice_ref || s.custom_voice_name || '';
+      if (activeVoicePreview && activeVoiceName) {
+        if (customVoiceRef) {
+          activeVoicePreview.style.display = 'block';
+          activeVoiceName.textContent = customVoiceRef;
+        } else {
+          activeVoicePreview.style.display = 'none';
+        }
+      }
+
+      // Bot Bridges & Features tabs
+      if (settingTelegramEnabled) settingTelegramEnabled.checked = s.telegram_bot_enabled === 'true';
+      if (settingTelegramToken && s.telegram_bot_token) settingTelegramToken.value = s.telegram_bot_token;
+      if (settingTelegramAllowed && s.telegram_allowed_id) settingTelegramAllowed.value = s.telegram_allowed_id;
+
+      if (settingDiscordEnabled) settingDiscordEnabled.checked = s.discord_bot_enabled === 'true';
+      if (settingDiscordToken && s.discord_bot_token) settingDiscordToken.value = s.discord_bot_token;
+      if (settingDiscordChannel && s.discord_channel_id) settingDiscordChannel.value = s.discord_channel_id;
+      if (settingDiscordAllowed && s.discord_allowed_id) settingDiscordAllowed.value = s.discord_allowed_id;
+
+      if (settingTimezoneEnabled) settingTimezoneEnabled.checked = s.timezone_enabled !== 'false';
+      if (settingTouchEnabled) settingTouchEnabled.checked = s.touch_enabled !== 'false';
+      if (settingMoodEnabled) {
+        settingMoodEnabled.checked = s.mood_enabled !== 'false';
+      }
+      if (settingIdleTalkEnabled) settingIdleTalkEnabled.checked = s.idle_talk_enabled === 'true';
+      if (settingSleepCycleEnabled) settingSleepCycleEnabled.checked = s.sleep_cycle_enabled === 'true';
+      if (settingWeatherEnabled) settingWeatherEnabled.checked = s.weather_enabled === 'true';
+      if (settingWeatherCity && s.weather_city) settingWeatherCity.value = s.weather_city;
+      if (settingLlmFallback1 && s.llm_fallback_1) settingLlmFallback1.value = s.llm_fallback_1;
+      if (settingLlmFallback2 && s.llm_fallback_2) settingLlmFallback2.value = s.llm_fallback_2;
+      if (settingSttEnabled) {
+        settingSttEnabled.checked = s.stt_enabled === 'true';
+        if (sttBtn) sttBtn.style.display = settingSttEnabled.checked ? 'flex' : 'none';
+      }
+      if (settingFreshrssEnabled) settingFreshrssEnabled.checked = s.freshrss_enabled === 'true';
+      if (settingFreshrssUrl && s.freshrss_url) settingFreshrssUrl.value = s.freshrss_url;
+      if (settingNotionEnabled) settingNotionEnabled.checked = s.notion_enabled === 'true';
+      if (settingNotionApiKey && s.notion_api_key) settingNotionApiKey.value = s.notion_api_key;
+      if (settingGoogleEnabled) settingGoogleEnabled.checked = s.google_enabled === 'true';
+      if (settingNextcloudEnabled) settingNextcloudEnabled.checked = s.nextcloud_enabled === 'true';
+
+      if (settingDebugMode) {
+        settingDebugMode.checked = debugManager.isDebugMode;
+      }
+
+      // Profile Tab fields (loaded from active companion row)
+      if (c) {
+        if (settingCharName) settingCharName.value = c.display_name || c.name || '';
+        if (settingMusicArtist) settingMusicArtist.value = c.display_name || c.name || '';
+        if (settingCharNicknames) settingCharNicknames.value = Array.isArray(c.nicknames) ? c.nicknames.join(', ') : '';
+        if (settingCharTags) settingCharTags.value = Array.isArray(c.tags) ? c.tags.join(', ') : '';
+        if (settingOwnerName) settingOwnerName.value = c.owner?.name || s.owner_name || 'User';
+        if (settingOwnerPronoun) settingOwnerPronoun.value = c.owner?.pronoun || s.owner_pronoun || 'they';
+        if (settingTimezone) settingTimezone.value = c.timezone || s.timezone || '';
+        if (settingTzLabel) settingTzLabel.value = c.tz_label || s.tz_label || '';
+        if (settingCharLanguage) settingCharLanguage.value = c.language || 'en';
+        if (settingCharCountry) settingCharCountry.value = c.country || '';
+        if (settingCharDescription) settingCharDescription.value = c.description || '';
+        if (settingPersonality) settingPersonality.value = c.personality || s.personality || '';
+        if (settingCharScenario) settingCharScenario.value = c.scenario || '';
+        if (settingCharFirstMessage) settingCharFirstMessage.value = c.first_message || '';
+        if (settingCharExamples) settingCharExamples.value = Array.isArray(c.example_messages) && c.example_messages.length ? JSON.stringify(c.example_messages, null, 2) : '';
+        if (settingCharFeedKeywords) settingCharFeedKeywords.value = Array.isArray(c.feed_keywords) ? c.feed_keywords.join(', ') : '';
+        if (settingCharSongs) settingCharSongs.value = Array.isArray(c.songs) ? c.songs.join(', ') : '';
+        updateSongCountBadge(Array.isArray(c.songs) ? c.songs.length : 0);
+        if (settingCharSongAliases) settingCharSongAliases.value = c.song_aliases && Object.keys(c.song_aliases).length ? JSON.stringify(c.song_aliases) : '';
+        if (settingCharSystemPrompt) settingCharSystemPrompt.value = c.system_prompt || '';
+      }
+
+      // Fetch live mood score for the active companion
+      try {
+        const moodRes = await fetch(`/api/characters/${encodeURIComponent(cur.id)}/mood`);
+        if (moodRes.ok) {
+          const m = await moodRes.json();
+          updateMoodBadge(m.score, m.bracket);
+        }
+      } catch {}
+    } catch (err: any) {
+      console.warn('[settings] Failed to load settings:', err);
+    }
+
     if (settingZoomSlider && getModel()) {
       settingZoomSlider.value = getModel().zoom.toFixed(2);
     }
     settingsModal.classList.add('active');
   };
+  (window as any).__openSettings = openSettings;
 
   btnOpenSettings?.addEventListener('click', openSettings);
   btnCloseSettings?.addEventListener('click', () => settingsModal.classList.remove('active'));
@@ -1535,11 +1541,12 @@ function setupUI(
 
   // Wire Mood Card Actions in Settings
   document.getElementById('btn-mood-cheer')?.addEventListener('click', async () => {
+    const cur = getCurChar();
     try {
       const res = await fetch('/api/interactions/touch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ characterId: currentChar.id, area: 'head' })
+        body: JSON.stringify({ characterId: cur.id, area: 'head' })
       });
       const data = await res.json();
       if (data?.bracket && data?.score !== undefined) {
@@ -1550,8 +1557,9 @@ function setupUI(
   });
 
   document.getElementById('btn-reset-mood')?.addEventListener('click', async () => {
+    const cur = getCurChar();
     try {
-      const res = await fetch(`/api/characters/${encodeURIComponent(currentChar.id)}/mood`, {
+      const res = await fetch(`/api/characters/${encodeURIComponent(cur.id)}/mood`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ score: 70 })
@@ -1564,7 +1572,45 @@ function setupUI(
     } catch {}
   });
 
+  // Auto-Fetch Songs from Music Database
+  btnFetchSongs?.addEventListener('click', async () => {
+    const cur = getCurChar();
+    const query = settingMusicArtist?.value.trim() || cur.displayName || cur.name;
+    if (!query) {
+      showToast('Please enter an artist name to search');
+      return;
+    }
+
+    btnFetchSongs.disabled = true;
+    btnFetchSongs.textContent = '⏳ Fetching...';
+    showToast(`Searching music database for "${query}"...`);
+
+    try {
+      const res = await fetch(`/api/characters/${encodeURIComponent(cur.id)}/sync-songs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artistQuery: query, append: true })
+      });
+
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.songs)) {
+        settingCharSongs.value = data.songs.join(', ');
+        updateSongCountBadge(data.songs.length);
+        showToast(`✓ Synced ${data.totalCount} songs (${data.addedCount} newly added) for ${query}!`, 3500);
+      } else {
+        showToast(data.error || 'No songs found in music database');
+      }
+    } catch (e: any) {
+      showToast(`Music fetch failed: ${e.message}`);
+    } finally {
+      btnFetchSongs.disabled = false;
+      btnFetchSongs.textContent = '🎵 Auto-Fetch Songs';
+    }
+  });
+
   btnSaveSettings?.addEventListener('click', async () => {
+    const cur = getCurChar();
+
     if (settingDebugMode) {
       debugManager.setDebugMode(settingDebugMode.checked);
     }
@@ -1628,9 +1674,15 @@ function setupUI(
       }
     };
 
-    // Save Character-specific Profile fields
+    // Parse songs list cleanly from comma-separated or newline-separated input
+    const parsedSongs = (settingCharSongs?.value || '')
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    // Save Character-specific Profile and AI/TTS preferences
     const charUpdatePayload = {
-      display_name: settingCharName?.value.trim() || currentChar.name,
+      display_name: settingCharName?.value.trim() || cur.name,
       nicknames_json: JSON.stringify(
         (settingCharNicknames?.value || '').split(',').map((s) => s.trim()).filter(Boolean)
       ),
@@ -1653,23 +1705,34 @@ function setupUI(
       feed_keywords_json: JSON.stringify(
         (settingCharFeedKeywords?.value || '').split(',').map((s) => s.trim()).filter(Boolean)
       ),
-      songs_json: JSON.stringify(
-        (settingCharSongs?.value || '').split(',').map((s) => s.trim()).filter(Boolean)
-      ),
+      songs_json: JSON.stringify(parsedSongs),
       song_aliases_json: safeJsonString(settingCharSongAliases?.value, '{}'),
-      system_prompt: settingCharSystemPrompt?.value.trim() || ''
+      system_prompt: settingCharSystemPrompt?.value.trim() || '',
+      // Character-specific AI & Voice preferences
+      ai_provider: settingProvider.value,
+      ai_model: settingModel.value,
+      custom_base_url: settingBaseUrl.value,
+      temperature: parseFloat(settingTemperature.value) || 0.75,
+      tts_engine: settingTtsEngine.value,
+      tts_voice: settingEdgeVoice.value
     };
 
     try {
-      await fetch(`/api/characters/${encodeURIComponent(currentChar.id)}`, {
+      await fetch(`/api/characters/${encodeURIComponent(cur.id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(charUpdatePayload)
       });
-      currentChar.displayName = charUpdatePayload.display_name;
-      currentChar.name = charUpdatePayload.display_name;
-      updateCompanionHeader(currentChar, currentCostume);
-      populateCharacterSelector(characters, currentChar.id);
+      cur.displayName = charUpdatePayload.display_name;
+      cur.name = charUpdatePayload.display_name;
+      (cur as any).ai_provider = charUpdatePayload.ai_provider;
+      (cur as any).ai_model = charUpdatePayload.ai_model;
+      (cur as any).custom_base_url = charUpdatePayload.custom_base_url;
+      (cur as any).temperature = charUpdatePayload.temperature;
+      (cur as any).tts_engine = charUpdatePayload.tts_engine;
+      (cur as any).tts_voice = charUpdatePayload.tts_voice;
+      updateCompanionHeader(cur, getCurrentCostume());
+      populateCharacterSelector(characters, cur.id);
     } catch (e: any) {
       console.warn('[settings] Failed to save character profile:', e);
     }
@@ -1680,7 +1743,7 @@ function setupUI(
       body: JSON.stringify(payload)
     });
     settingsModal.classList.remove('active');
-    showToast('Settings saved successfully');
+    showToast(`Settings saved for ${cur.displayName || cur.name}`);
   });
 }
 

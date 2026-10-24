@@ -32,16 +32,16 @@ export function renderMarkdown(raw: string): string {
   html = html.replace(/`([^`\n]+)`/g, '<code class="chat-code">$1</code>');
 
   // 5. Bold + Italic: ***text*** or ___text___
-  html = html.replace(/\*\*\*([^\*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
-  html = html.replace(/___([^_\n]+)___/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/(?<!\*)\*\*\*(?!\s|\*)([^\*\n]+?)(?<!\s|\*)\*\*\*(?!\*)/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/(?<!_)___(?!\s|_)([^_\n]+?)(?<!\s|_)___(?!_)/g, '<strong><em>$1</em></strong>');
 
   // 6. Bold: **text** or __text__
-  html = html.replace(/\*\*([^\*\n]+)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+  html = html.replace(/(?<!\*)\*\*(?!\s|\*)([^\*\n]+?)(?<!\s|\*)\*\*(?!\*)/g, '<strong>$1</strong>');
+  html = html.replace(/(?<!_)__(?!\s|_)([^_\n]+?)(?<!\s|_)__(?!_)/g, '<strong>$1</strong>');
 
-  // 7. Italic: *text* or _text_ (allowing punctuation and words)
-  html = html.replace(/(^|[^\*])\*([^\*\n]+)\*([^\*]|$)/g, '$1<em>$2</em>$3');
-  html = html.replace(/(^|[^_])_([^_\n]+)_([^_]|$)/g, '$1<em>$2</em>$3');
+  // 7. Italic: *text* or _text_ (allowing punctuation, words, and Japanese characters without eating spaces)
+  html = html.replace(/(?<!\*)\*(?!\s|\*)([^\*\n]+?)(?<!\s|\*)\*(?!\*)/g, '<em>$1</em>');
+  html = html.replace(/(?<!_)_(?!\s|_)([^_\n]+?)(?<!\s|_)_(?!_)/g, '<em>$1</em>');
 
   // 8. Convert newlines to <br> (preserving consecutive breaks)
   html = html.replace(/\r\n|\r|\n/g, '<br>');
