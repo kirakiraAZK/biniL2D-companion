@@ -5,8 +5,18 @@ export interface WSMessage {
   [key: string]: any;
 }
 
+export interface DebugLogEntry {
+  id: string;
+  timestamp: number;
+  category: 'AI' | 'WS' | 'TTS' | 'INTERACTION' | 'MOOD' | 'SYSTEM';
+  title: string;
+  data?: any;
+}
+
 class WebSocketHub {
   private clients = new Set<WebSocket>();
+  private logRing: DebugLogEntry[] = [];
+  private readonly MAX_LOGS = 200;
 
   addClient(ws: WebSocket): void {
     this.clients.add(ws);
@@ -41,12 +51,53 @@ class WebSocketHub {
     });
   }
 
+  log(category: DebugLogEntry['category'], title: string, data?: any): void {
+    const entry: DebugLogEntry = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: Date.now(),
+      category,
+      title,
+      data
+    };
+
+    this.logRing.push(entry);
+    if (this.logRing.length > this.MAX_LOGS) {
+      this.logRing.shift();
+    }
+
+    // Broadcast log event directly to all listening clients
+    const payload = JSON.stringify({ type: 'debug_log', log: entry });
+    for (const client of this.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
+    }
+  }
+
+  getRecentLogs(limit = 100): DebugLogEntry[] {
+    return this.logRing.slice(-limit);
+  }
+
+  clearLogs(): void {
+    this.logRing = [];
+  }
+
   broadcast(message: WSMessage): void {
     const payload = JSON.stringify(message);
     for (const client of this.clients) {
       if (client.readyState === WebSocket.OPEN) {
         client.send(payload);
       }
+    }
+
+    // Auto-record non-internal WS events in debug log
+    if (message.type !== 'debug_log' && message.type !== 'stream_token') {
+      let cat: DebugLogEntry['category'] = 'WS';
+      if (message.type === 'chat') cat = 'AI';
+      else if (message.type.startsWith('chat_')) cat = 'INTERACTION';
+      else if (message.type === 'mood_update') cat = 'MOOD';
+      else if (message.type.startsWith('audio')) cat = 'TTS';
+      this.log(cat, `WS Broadcast: ${message.type}`, message);
     }
   }
 

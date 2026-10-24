@@ -11,6 +11,8 @@ import { setupPet, enableResize, onCursor, inTauri } from './pet';
 import { LipSync } from './audio';
 import { IdleDirector } from './idle';
 import { loadRegistry, pickCostume, resolveModel, Character, Costume } from './registry';
+import { renderMarkdown } from './markdown';
+import { debugManager } from './debug';
 
 // DOM Elements
 const canvas = document.getElementById('view') as HTMLCanvasElement;
@@ -21,6 +23,8 @@ const companionCostumeEl = document.getElementById('companion-costume-label') as
 const companionInitialEl = document.getElementById('companion-initial') as HTMLElement;
 const selectCharacter = document.getElementById('select-character') as HTMLSelectElement;
 const selectCostume = document.getElementById('select-costume') as HTMLSelectElement;
+const btnRenameCharacter = document.getElementById('btn-rename-character') as HTMLButtonElement;
+const btnRenameCostume = document.getElementById('btn-rename-costume') as HTMLButtonElement;
 const chatMessagesEl = document.getElementById('chat-messages') as HTMLDivElement;
 const chatInput = document.getElementById('chat-input') as HTMLTextAreaElement;
 const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
@@ -77,6 +81,50 @@ const settingDiscordToken = document.getElementById('setting-discord-token') as 
 const settingDiscordChannel = document.getElementById('setting-discord-channel') as HTMLInputElement;
 const settingDiscordAllowed = document.getElementById('setting-discord-allowed') as HTMLInputElement;
 
+// Profile Inputs (All character.example.json fields)
+const settingCharName = document.getElementById('setting-char-name') as HTMLInputElement;
+const settingCharNicknames = document.getElementById('setting-char-nicknames') as HTMLInputElement;
+const settingCharTags = document.getElementById('setting-char-tags') as HTMLInputElement;
+const settingOwnerName = document.getElementById('setting-owner-name') as HTMLInputElement;
+const settingOwnerPronoun = document.getElementById('setting-owner-pronoun') as HTMLInputElement;
+const settingTimezone = document.getElementById('setting-timezone') as HTMLInputElement;
+const settingTzLabel = document.getElementById('setting-tz-label') as HTMLInputElement;
+const settingCharLanguage = document.getElementById('setting-char-language') as HTMLInputElement;
+const settingCharCountry = document.getElementById('setting-char-country') as HTMLInputElement;
+const settingCharDescription = document.getElementById('setting-char-description') as HTMLTextAreaElement;
+const settingPersonality = document.getElementById('setting-personality') as HTMLTextAreaElement;
+const settingCharScenario = document.getElementById('setting-char-scenario') as HTMLTextAreaElement;
+const settingCharFirstMessage = document.getElementById('setting-char-first-message') as HTMLInputElement;
+const settingCharExamples = document.getElementById('setting-char-examples') as HTMLTextAreaElement;
+const settingCharFeedKeywords = document.getElementById('setting-char-feed-keywords') as HTMLInputElement;
+const settingCharSongs = document.getElementById('setting-char-songs') as HTMLInputElement;
+const settingCharSongAliases = document.getElementById('setting-char-song-aliases') as HTMLInputElement;
+const settingCharSystemPrompt = document.getElementById('setting-char-system-prompt') as HTMLTextAreaElement;
+
+// Badges & STT
+const companionMoodBadge = document.getElementById('companion-mood-badge') as HTMLElement;
+const companionSleepBadge = document.getElementById('companion-sleep-badge') as HTMLElement;
+const sttBtn = document.getElementById('stt-btn') as HTMLButtonElement;
+
+// Autonomy, Fallback & Connector Toggles
+const settingTimezoneEnabled = document.getElementById('setting-timezone-enabled') as HTMLInputElement;
+const settingTouchEnabled = document.getElementById('setting-touch-enabled') as HTMLInputElement;
+const settingMoodEnabled = document.getElementById('setting-mood-enabled') as HTMLInputElement;
+const settingIdleTalkEnabled = document.getElementById('setting-idle-talk-enabled') as HTMLInputElement;
+const settingSleepCycleEnabled = document.getElementById('setting-sleep-cycle-enabled') as HTMLInputElement;
+const settingWeatherEnabled = document.getElementById('setting-weather-enabled') as HTMLInputElement;
+const settingWeatherCity = document.getElementById('setting-weather-city') as HTMLInputElement;
+const settingLlmFallback1 = document.getElementById('setting-llm-fallback-1') as HTMLSelectElement;
+const settingLlmFallback2 = document.getElementById('setting-llm-fallback-2') as HTMLSelectElement;
+const settingSttEnabled = document.getElementById('setting-stt-enabled') as HTMLInputElement;
+const settingFreshrssEnabled = document.getElementById('setting-freshrss-enabled') as HTMLInputElement;
+const settingFreshrssUrl = document.getElementById('setting-freshrss-url') as HTMLInputElement;
+const settingNotionEnabled = document.getElementById('setting-notion-enabled') as HTMLInputElement;
+const settingNotionApiKey = document.getElementById('setting-notion-api-key') as HTMLInputElement;
+const settingGoogleEnabled = document.getElementById('setting-google-enabled') as HTMLInputElement;
+const settingNextcloudEnabled = document.getElementById('setting-nextcloud-enabled') as HTMLInputElement;
+const settingDebugMode = document.getElementById('setting-debug-mode') as HTMLInputElement;
+
 // Toast Helper
 function showToast(msg: string, duration = 2800) {
   if (!statusToast) return;
@@ -85,6 +133,43 @@ function showToast(msg: string, duration = 2800) {
   setTimeout(() => {
     statusToast.style.opacity = '0.4';
   }, duration);
+}
+
+function updateMoodBadge(score: number, bracket?: { emoji?: string; label?: string }) {
+  const emoji = bracket?.emoji || (score >= 90 ? '💖' : score >= 70 ? '😊' : score >= 50 ? '😏' : score >= 30 ? '😤' : '🧊');
+  const label = bracket?.label || (score >= 90 ? 'Adoring' : score >= 70 ? 'Cheerful' : score >= 50 ? 'Sassy' : score >= 30 ? 'Reluctant' : 'Defiant');
+
+  if (companionMoodBadge) {
+    const isEnabled = settingMoodEnabled ? settingMoodEnabled.checked : true;
+    if (!isEnabled) {
+      companionMoodBadge.style.display = 'none';
+    } else {
+      companionMoodBadge.innerHTML = `${emoji} ${score} ${label}`;
+      companionMoodBadge.style.display = 'inline-flex';
+    }
+  }
+
+  // Live updates to Profile Settings Mood Card
+  const profileMoodEmoji = document.getElementById('profile-mood-emoji');
+  const profileMoodNum = document.getElementById('profile-mood-number');
+  const profileMoodLabel = document.getElementById('profile-mood-label');
+  const profileMoodFill = document.getElementById('profile-mood-fill');
+  const profileMoodDesc = document.getElementById('profile-mood-desc');
+
+  if (profileMoodEmoji) profileMoodEmoji.textContent = emoji;
+  if (profileMoodNum) profileMoodNum.textContent = String(score);
+  if (profileMoodLabel) profileMoodLabel.textContent = label;
+  if (profileMoodFill) profileMoodFill.style.width = `${Math.max(0, Math.min(100, score))}%`;
+  if (profileMoodDesc) {
+    const descriptions: Record<string, string> = {
+      Adoring: 'Deeply attached, affectionate, fond of compliments, and cheerful.',
+      Cheerful: 'Content, playful, and responsive companion state.',
+      Sassy: 'Playfully teasing, witty, and slightly sarcastic.',
+      Reluctant: 'Slightly irritated with mild sighs, but still participating.',
+      Icy: 'Bare-minimum words; needs warm reassurance or apologies.'
+    };
+    profileMoodDesc.textContent = descriptions[label] || `${label} companion state.`;
+  }
 }
 
 // Emotion mapping for Live2D expressions
@@ -107,6 +192,7 @@ async function main() {
   }
 
   installCoreCompat(console.log);
+  debugManager.init();
 
   const option = new Option();
   option.logFunction = (m: string) => console.log('[cubism]', m);
@@ -129,8 +215,10 @@ async function main() {
   const savedCharId = localStorage.getItem('character');
   let currentCharacter = characters.find((c) => c.id === savedCharId) ?? characters[0];
 
-  const savedCostumeId = localStorage.getItem('costume');
-  let currentCostume = pickCostume(currentCharacter, savedCostumeId ?? undefined);
+  const savedCostumeId = localStorage.getItem(`costume_${currentCharacter.id}`) || currentCharacter.activeCostumeId;
+  let currentCostume = pickCostume(currentCharacter, savedCostumeId);
+  currentCharacter.activeCostumeId = currentCostume.id;
+  localStorage.setItem(`costume_${currentCharacter.id}`, currentCostume.id);
 
   updateCompanionHeader(currentCharacter, currentCostume);
   populateCharacterSelector(characters, currentCharacter.id);
@@ -210,7 +298,14 @@ async function main() {
   // Costume Switcher function
   let isSwitchingCostume = false;
   const switchCostume = async (costumeId: string): Promise<void> => {
-    const next = currentCharacter.costumes.find((c) => c.id === costumeId);
+    const target = (costumeId || '').trim().toLowerCase();
+    const next = currentCharacter.costumes.find(
+      (c) =>
+        c.id.toLowerCase() === target ||
+        (c as any).costume_slug?.toLowerCase() === target ||
+        c.name.toLowerCase() === target ||
+        c.id.toLowerCase().endsWith(`::${target}`)
+    );
     if (!next || isSwitchingCostume || next.id === currentCostume.id) return;
     isSwitchingCostume = true;
     showToast(`Switching outfit to ${next.name}...`);
@@ -229,7 +324,12 @@ async function main() {
 
       // Restore costume-specific position & zoom for this outfit
       currentCostume = next;
+      currentCharacter.activeCostumeId = next.id;
+      const charInList = characters.find(c => c.id === currentCharacter.id);
+      if (charInList) charInList.activeCostumeId = next.id;
+      localStorage.setItem(`costume_${currentCharacter.id}`, next.id);
       localStorage.setItem('costume', next.id);
+      debugManager.log('INTERACTION', `Costume switched: ${next.name} (${next.id})`);
       restoreModelTransform(currentCharacter.id, currentCostume.id, fresh);
       model = fresh;
       prev.release();
@@ -238,7 +338,7 @@ async function main() {
       populateCostumeSelector(currentCharacter.costumes, currentCostume.id);
       showToast(`Outfit: ${next.name}`);
 
-      void fetch(`/api/characters/${currentCharacter.id}/costume`, {
+      void fetch(`/api/characters/${encodeURIComponent(currentCharacter.id)}/costume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ costumeId: next.id })
@@ -258,9 +358,14 @@ async function main() {
 
     showToast(`Loading companion ${nextChar.name}...`);
     currentCharacter = nextChar;
-    currentCostume = pickCostume(currentCharacter, currentCharacter.activeCostumeId);
+    const savedCostumeId = localStorage.getItem(`costume_${nextChar.id}`) || nextChar.activeCostumeId;
+    currentCostume = pickCostume(currentCharacter, savedCostumeId);
+    currentCharacter.activeCostumeId = currentCostume.id;
+    nextChar.activeCostumeId = currentCostume.id;
     localStorage.setItem('character', nextChar.id);
+    localStorage.setItem(`costume_${nextChar.id}`, currentCostume.id);
     localStorage.setItem('costume', currentCostume.id);
+    debugManager.log('INTERACTION', `Switched character: ${nextChar.name}, outfit: ${currentCostume.name} (${currentCostume.id})`);
 
     const prev = model;
     try {
@@ -283,6 +388,18 @@ async function main() {
       populateCharacterSelector(characters, currentCharacter.id);
       populateCostumeSelector(currentCharacter.costumes, currentCostume.id);
       await loadConversationHistory(currentCharacter.id);
+      void fetch(`/api/characters/${encodeURIComponent(currentCharacter.id)}/costume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ costumeId: currentCostume.id })
+      });
+      fetch(`/api/characters/${encodeURIComponent(currentCharacter.id)}/mood`)
+        .then(r => r.json())
+        .then(data => {
+          if (data?.bracket && data?.score !== undefined) {
+            updateMoodBadge(data.score, data.bracket);
+          }
+        }).catch(() => {});
       showToast(`Switched to ${currentCharacter.name}`);
     } catch (e: any) {
       showToast(`Character switch failed: ${e.message}`);
@@ -336,11 +453,67 @@ async function main() {
     () => currentCharacter.id
   );
 
+  // Rename Character Button
+  btnRenameCharacter?.addEventListener('click', async () => {
+    const currentName = currentCharacter.displayName || currentCharacter.name;
+    const newName = prompt(`Enter custom display name for ${currentName}:`, currentName);
+    if (!newName || !newName.trim() || newName.trim() === currentName) return;
+    const trimmed = newName.trim();
+    try {
+      const res = await fetch(`/api/characters/${currentCharacter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: trimmed })
+      });
+      if (res.ok) {
+        currentCharacter.displayName = trimmed;
+        currentCharacter.name = trimmed;
+        updateCompanionHeader(currentCharacter, currentCostume);
+        populateCharacterSelector(characters, currentCharacter.id);
+        showToast(`Renamed companion to: ${trimmed}`);
+      }
+    } catch (e: any) {
+      showToast(`Rename failed: ${e.message}`);
+    }
+  });
+
+  // Rename Costume Button (without touching disk folders)
+  btnRenameCostume?.addEventListener('click', async () => {
+    const currentCostumeName = currentCostume.name;
+    const newName = prompt(`Enter custom friendly name for outfit "${currentCostumeName}":`, currentCostumeName);
+    if (!newName || !newName.trim() || newName.trim() === currentCostumeName) return;
+    const trimmed = newName.trim();
+    try {
+      const res = await fetch(`/api/characters/${currentCharacter.id}/costumes/${currentCostume.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed })
+      });
+      if (res.ok) {
+        currentCostume.name = trimmed;
+        updateCompanionHeader(currentCharacter, currentCostume);
+        populateCostumeSelector(currentCharacter.costumes, currentCostume.id);
+        showToast(`Renamed outfit to: ${trimmed}`);
+      }
+    } catch (e: any) {
+      showToast(`Rename failed: ${e.message}`);
+    }
+  });
+
   // Setup WebSocket Link
-  setupWebSocket(stage, lipSync, switchCostume, triggerEmotion);
+  setupWebSocket(stage, lipSync, switchCostume, triggerEmotion, () => characters, () => currentCharacter);
 
   // Load chat history
   await loadConversationHistory(currentCharacter.id);
+
+  // Load initial mood
+  fetch(`/api/characters/${encodeURIComponent(currentCharacter.id)}/mood`)
+    .then(r => r.json())
+    .then(data => {
+      if (data?.bracket && data?.score !== undefined) {
+        updateMoodBadge(data.score, data.bracket);
+      }
+    }).catch(() => {});
 }
 
 // --- Position & Zoom Helpers (Per Character & Costume) ---
@@ -417,6 +590,7 @@ function setupModelRepositioning(
   let startY = 0;
   let initialOffsetX = 0;
   let initialOffsetY = 0;
+  let hasMoved = false;
 
   // Drag on Left Click (0), Middle Click (1), or Right Click (2)
   const onMouseDown = (e: MouseEvent) => {
@@ -428,6 +602,7 @@ function setupModelRepositioning(
 
     e.preventDefault();
     isDragging = true;
+    hasMoved = false;
     wrapper.classList.add('dragging');
     startX = e.clientX;
     startY = e.clientY;
@@ -438,6 +613,9 @@ function setupModelRepositioning(
 
   const onMouseMove = (e: MouseEvent) => {
     if (!isDragging) return;
+    if (Math.hypot(e.clientX - startX, e.clientY - startY) > 6) {
+      hasMoved = true;
+    }
     const rect = wrapper.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
 
@@ -454,8 +632,33 @@ function setupModelRepositioning(
     if (isDragging) {
       isDragging = false;
       wrapper.classList.remove('dragging');
-      // Auto-save silently for this character & outfit so dragging is never lost
-      saveModelTransform(getCharId(), getCostumeId(), getModel(), false);
+      if (hasMoved) {
+        // Auto-save silently for this character & outfit so dragging is never lost
+        saveModelTransform(getCharId(), getCostumeId(), getModel(), false);
+      } else {
+        // Tap/click detected without dragging
+        const touchEnabled = settingTouchEnabled ? settingTouchEnabled.checked : true;
+        if (touchEnabled) {
+          const rect = wrapper.getBoundingClientRect();
+          const area = (startY - rect.top) < (rect.height * 0.45) ? 'head' : 'body';
+          void fetch('/api/interactions/touch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ characterId: getCharId(), area })
+          }).then(res => res.json()).then(data => {
+            if (data?.bracket && data?.score !== undefined) {
+              updateMoodBadge(data.score, data.bracket);
+            }
+          }).catch(() => {});
+
+          const currentModel = getModel();
+          const motions = area === 'head'
+            ? ['joy-01_lv03', 'smile-01_lv03', 'doya-01_lv03', 'shy-01_lv03']
+            : ['anger-01_lv03', 'surprise-01_lv03', 'serious-01_lv03'];
+          const pick = motions[Math.floor(Math.random() * motions.length)];
+          void currentModel.playMotion(pick);
+        }
+      }
     }
   };
 
@@ -584,11 +787,76 @@ async function loadConversationHistory(characterId: string) {
 
     chatMessagesEl.innerHTML = '';
     for (const m of msgs) {
-      appendMessageBubble(m.role, m.content, m.emotion, m.motion, m.audio_url);
+      appendMessageBubble(m.role, m.content, m.emotion, m.motion, m.audio_url, m.thought, m.costume, m.raw_content);
     }
   } catch (e) {
     console.warn('[history] Failed to load messages:', e);
   }
+}
+
+function createRawDebugElement(rawText: string): { details: HTMLDetailsElement; rawBtn: HTMLButtonElement } {
+  const isGlobalRaw = localStorage.getItem('show_raw_in_chat') === 'true';
+  const isDbg = debugManager.isDebugMode;
+
+  const rawBtn = document.createElement('button');
+  rawBtn.className = 'tag-pill raw-btn';
+  rawBtn.title = 'Click to view / hide original unparsed AI output';
+  rawBtn.innerHTML = '👁️ Raw';
+  if (isGlobalRaw) rawBtn.classList.add('active');
+
+  const details = document.createElement('details');
+  details.className = 'msg-debug-details';
+  details.style.display = isGlobalRaw || isDbg ? 'block' : 'none';
+  if (isGlobalRaw) details.open = true;
+
+  const summary = document.createElement('summary');
+  summary.className = 'msg-debug-summary';
+  summary.innerHTML = `<span>🔍 Raw AI Output (${rawText.length} chars)</span>`;
+
+  const header = document.createElement('div');
+  header.className = 'msg-debug-header';
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn-copy-raw-inline';
+  copyBtn.innerHTML = '📋 Copy';
+  copyBtn.onclick = (e) => {
+    e.stopPropagation();
+    void navigator.clipboard.writeText(rawText);
+    copyBtn.innerHTML = '✓ Copied';
+    setTimeout(() => {
+      copyBtn.innerHTML = '📋 Copy';
+    }, 1500);
+  };
+  header.appendChild(copyBtn);
+
+  const pre = document.createElement('pre');
+  pre.className = 'msg-debug-pre';
+  pre.textContent = rawText;
+
+  details.appendChild(summary);
+  details.appendChild(header);
+  details.appendChild(pre);
+
+  rawBtn.onclick = (e) => {
+    e.stopPropagation();
+    details.style.display = 'block';
+    details.open = !details.open;
+    if (details.open) {
+      rawBtn.classList.add('active');
+    } else {
+      rawBtn.classList.remove('active');
+      if (!debugManager.isDebugMode && localStorage.getItem('show_raw_in_chat') !== 'true') {
+        details.style.display = 'none';
+      }
+    }
+  };
+
+  details.addEventListener('toggle', () => {
+    if (details.open) rawBtn.classList.add('active');
+    else rawBtn.classList.remove('active');
+  });
+
+  return { details, rawBtn };
 }
 
 function appendMessageBubble(
@@ -596,8 +864,20 @@ function appendMessageBubble(
   content: string,
   emotion?: string,
   motion?: string,
-  audioUrl?: string
+  audioUrl?: string,
+  thought?: string,
+  costume?: string,
+  rawContent?: string
 ): HTMLDivElement {
+  // Extract and strip any embedded <think>...</think> from content (for historical or raw messages)
+  let thoughtText = thought || '';
+  const thinkRegex = /<(?:think|thought|reasoning)[^>]*>([\s\S]*?)<\/(?:think|thought|reasoning)>/i;
+  const thinkMatch = thinkRegex.exec(content);
+  if (thinkMatch) {
+    if (!thoughtText) thoughtText = thinkMatch[1].trim();
+    content = content.replace(thinkRegex, '').trim();
+  }
+
   const row = document.createElement('div');
   row.className = `msg-row ${role}`;
 
@@ -619,9 +899,43 @@ function appendMessageBubble(
     meta.appendChild(motionPill);
   }
 
+  if (costume) {
+    const costumePill = document.createElement('span');
+    costumePill.className = 'tag-pill costume';
+    costumePill.textContent = `👔 ${costume}`;
+    meta.appendChild(costumePill);
+  }
+
   const bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
-  bubble.textContent = content;
+
+  // If thought is present, add a collapsible details box
+  if (thoughtText) {
+    const details = document.createElement('details');
+    details.className = 'thought-accordion';
+    const summary = document.createElement('summary');
+    summary.className = 'thought-summary';
+    summary.textContent = '💭 Thought Process';
+    const thoughtBody = document.createElement('div');
+    thoughtBody.className = 'thought-body';
+    thoughtBody.textContent = thoughtText;
+    details.appendChild(summary);
+    details.appendChild(thoughtBody);
+    bubble.appendChild(details);
+  }
+
+  const textSpan = document.createElement('span');
+  textSpan.className = 'bubble-text';
+  textSpan.innerHTML = renderMarkdown(content.trim());
+  bubble.appendChild(textSpan);
+
+  // In Debug / Raw Mode: Show collapsible original raw AI output with inline copy and pill toggle
+  if (role === 'assistant' && (rawContent || content)) {
+    const rawToDisplay = rawContent || content;
+    const { details, rawBtn } = createRawDebugElement(rawToDisplay);
+    meta.appendChild(rawBtn);
+    bubble.appendChild(details);
+  }
 
   row.appendChild(meta);
   row.appendChild(bubble);
@@ -671,8 +985,9 @@ function setupUI(
     const text = chatInput.value.trim();
     if (!text) return;
     chatInput.value = '';
-    chatInput.style.height = 'auto';
+    adjustChatInputHeight();
 
+    debugManager.log('AI', `User sent: "${text.slice(0, 60)}"`, { text });
     appendMessageBubble('user', text);
 
     // Placeholder assistant bubble with streaming cursor
@@ -708,6 +1023,8 @@ function setupUI(
       const decoder = new TextDecoder();
       let streamedText = '';
       let receivedAudioUrl = '';
+      let receivedThought = '';
+      let doneData: any = null;
 
       if (reader) {
         let buffer = '';
@@ -724,17 +1041,46 @@ function setupUI(
               const data = JSON.parse(line.slice(5).trim());
               if (data.type === 'token') {
                 streamedText += data.token;
-                pendingBubble.textContent = streamedText;
+                pendingBubble.innerHTML = renderMarkdown(streamedText);
                 pendingBubble.appendChild(cursor);
                 chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+              } else if (data.type === 'thought') {
+                receivedThought += data.thought;
               } else if (data.type === 'audio') {
                 receivedAudioUrl = data.audio_url;
               } else if (data.type === 'done') {
+                doneData = data;
                 cursor.remove();
+                if (data.thought) receivedThought = data.thought;
+                if (data.message?.thought) receivedThought = data.message.thought;
                 if (data.message?.audio_url) receivedAudioUrl = data.message.audio_url;
-                if (data.message?.emotion) {
-                  pendingMeta.innerHTML = `<span>Companion</span><span class="tag-pill">${data.message.emotion}</span>`;
+
+                if (data.debug) {
+                  debugManager.setLatestRaw(data.debug.raw_output || streamedText, {
+                    provider: data.debug.provider,
+                    model: data.debug.model,
+                    latencyMs: data.debug.latency_ms
+                  });
+                  if (data.debug.prompt_messages) {
+                    debugManager.setLatestPrompt(data.debug.prompt_messages);
+                  }
+                  debugManager.log('AI', `AI Stream Completed (${data.debug.latency_ms}ms)`, data.debug);
+                } else if (data.message?.raw_content) {
+                  debugManager.setLatestRaw(data.message.raw_content);
                 }
+
+                let metaHtml = '<span>Companion</span>';
+                if (data.message?.emotion && data.message.emotion !== 'NEUTRAL') {
+                  metaHtml += `<span class="tag-pill">${data.message.emotion}</span>`;
+                }
+                if (data.message?.motion) {
+                  metaHtml += `<span class="tag-pill motion">${data.message.motion}</span>`;
+                }
+                if (data.message?.costume) {
+                  metaHtml += `<span class="tag-pill costume">👔 ${data.message.costume}</span>`;
+                  void switchCostume(data.message.costume);
+                }
+                pendingMeta.innerHTML = metaHtml;
               }
             } catch {}
           }
@@ -742,6 +1088,36 @@ function setupUI(
       }
 
       cursor.remove();
+      pendingBubble.innerHTML = '';
+
+      // If thought was captured, render collapsible accordion
+      if (receivedThought) {
+        const details = document.createElement('details');
+        details.className = 'thought-accordion';
+        const summary = document.createElement('summary');
+        summary.className = 'thought-summary';
+        summary.textContent = '💭 Thought Process';
+        const thoughtBody = document.createElement('div');
+        thoughtBody.className = 'thought-body';
+        thoughtBody.textContent = receivedThought;
+        details.appendChild(summary);
+        details.appendChild(thoughtBody);
+        pendingBubble.appendChild(details);
+      }
+
+      const textSpan = document.createElement('span');
+      textSpan.className = 'bubble-text';
+      textSpan.innerHTML = renderMarkdown(streamedText.trim());
+      pendingBubble.appendChild(textSpan);
+
+      // In Debug / Raw Mode: Show collapsible original raw AI output with inline copy and pill toggle
+      const rawTextToDisplay = doneData?.debug?.raw_output || doneData?.message?.raw_content || streamedText;
+      if (rawTextToDisplay) {
+        const { details, rawBtn } = createRawDebugElement(rawTextToDisplay);
+        pendingMeta.appendChild(rawBtn);
+        pendingBubble.appendChild(details);
+      }
+
       if (receivedAudioUrl) {
         const chip = document.createElement('div');
         chip.className = 'audio-chip';
@@ -765,9 +1141,97 @@ function setupUI(
     }
   });
 
-  chatInput?.addEventListener('input', () => {
-    chatInput.style.height = 'auto';
-    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
+  const adjustChatInputHeight = () => {
+    if (!chatInput) return;
+    const wrapper = chatInput.closest('.input-wrapper') as HTMLElement;
+    if (!chatInput.value) {
+      chatInput.style.height = '24px';
+      if (wrapper) wrapper.style.alignItems = 'center';
+      return;
+    }
+    chatInput.style.height = '24px';
+    const targetH = Math.max(24, Math.min(chatInput.scrollHeight, 120));
+    chatInput.style.height = `${targetH}px`;
+    if (wrapper) {
+      wrapper.style.alignItems = targetH > 28 ? 'flex-end' : 'center';
+    }
+  };
+
+  adjustChatInputHeight();
+
+  chatInput?.addEventListener('input', adjustChatInputHeight);
+
+  // Voice Dictation (STT) setup
+  if (sttBtn) {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      let isRecording = false;
+
+      recognition.onstart = () => {
+        isRecording = true;
+        sttBtn.classList.add('recording');
+        showToast('Listening... Speak now', 2500);
+      };
+      recognition.onresult = (evt: any) => {
+        const transcript = evt.results?.[0]?.[0]?.transcript || '';
+        if (transcript && chatInput) {
+          chatInput.value = (chatInput.value ? chatInput.value + ' ' : '') + transcript;
+          adjustChatInputHeight();
+          chatInput.focus();
+        }
+      };
+      recognition.onerror = (e: any) => {
+        console.warn('[stt] error:', e);
+        sttBtn.classList.remove('recording');
+        isRecording = false;
+      };
+      recognition.onend = () => {
+        isRecording = false;
+        sttBtn.classList.remove('recording');
+      };
+
+      sttBtn.addEventListener('click', () => {
+        if (!isRecording) {
+          try { recognition.start(); } catch {}
+        } else {
+          try { recognition.stop(); } catch {}
+        }
+      });
+    } else {
+      sttBtn.title = 'SpeechRecognition not supported in this browser';
+    }
+  }
+
+  // Toggle Raw AI Output across all Chat Bubbles
+  const btnToggleRawChat = document.getElementById('btn-toggle-raw-chat');
+  let isRawChatVisible = localStorage.getItem('show_raw_in_chat') === 'true';
+  if (btnToggleRawChat && isRawChatVisible) {
+    btnToggleRawChat.classList.add('active');
+  }
+
+  btnToggleRawChat?.addEventListener('click', () => {
+    isRawChatVisible = !isRawChatVisible;
+    localStorage.setItem('show_raw_in_chat', String(isRawChatVisible));
+    if (isRawChatVisible) {
+      btnToggleRawChat.classList.add('active');
+      showToast('Raw AI Output enabled in chat');
+    } else {
+      btnToggleRawChat.classList.remove('active');
+      showToast('Raw AI Output hidden in chat');
+    }
+
+    document.querySelectorAll<HTMLDetailsElement>('.msg-debug-details').forEach((el) => {
+      el.style.display = isRawChatVisible || debugManager.isDebugMode ? 'block' : 'none';
+      el.open = isRawChatVisible;
+    });
+
+    document.querySelectorAll<HTMLButtonElement>('.tag-pill.raw-btn').forEach((btn) => {
+      if (isRawChatVisible) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
   });
 
   btnClearChat?.addEventListener('click', async () => {
@@ -966,6 +1430,97 @@ function setupUI(
         if (s.discord_bot_token) settingDiscordToken.value = s.discord_bot_token;
         if (s.discord_channel_id) settingDiscordChannel.value = s.discord_channel_id;
         if (s.discord_allowed_id) settingDiscordAllowed.value = s.discord_allowed_id;
+
+        if (settingCharName) settingCharName.value = currentChar.displayName || currentChar.name || '';
+        if (s.owner_name && settingOwnerName) settingOwnerName.value = s.owner_name;
+        if (s.owner_pronoun && settingOwnerPronoun) settingOwnerPronoun.value = s.owner_pronoun;
+        if (s.timezone && settingTimezone) settingTimezone.value = s.timezone;
+        if (s.tz_label && settingTzLabel) settingTzLabel.value = s.tz_label;
+        if (s.personality && settingPersonality) settingPersonality.value = s.personality;
+
+        if (s.timezone_enabled !== undefined && settingTimezoneEnabled) {
+          settingTimezoneEnabled.checked = s.timezone_enabled !== 'false';
+        }
+        if (s.touch_enabled !== undefined && settingTouchEnabled) {
+          settingTouchEnabled.checked = s.touch_enabled !== 'false';
+        }
+        if (s.mood_enabled !== undefined && settingMoodEnabled) {
+          settingMoodEnabled.checked = s.mood_enabled !== 'false';
+        } else if (settingMoodEnabled) {
+          settingMoodEnabled.checked = true;
+        }
+        if (s.idle_talk_enabled !== undefined && settingIdleTalkEnabled) {
+          settingIdleTalkEnabled.checked = s.idle_talk_enabled === 'true';
+        }
+        if (s.sleep_cycle_enabled !== undefined && settingSleepCycleEnabled) {
+          settingSleepCycleEnabled.checked = s.sleep_cycle_enabled === 'true';
+        }
+        if (s.weather_enabled !== undefined && settingWeatherEnabled) {
+          settingWeatherEnabled.checked = s.weather_enabled === 'true';
+        }
+        if (s.weather_city && settingWeatherCity) {
+          settingWeatherCity.value = s.weather_city;
+        }
+
+        if (s.llm_fallback_1 && settingLlmFallback1) settingLlmFallback1.value = s.llm_fallback_1;
+        if (s.llm_fallback_2 && settingLlmFallback2) settingLlmFallback2.value = s.llm_fallback_2;
+        if (s.stt_enabled !== undefined && settingSttEnabled) {
+          settingSttEnabled.checked = s.stt_enabled === 'true';
+          if (sttBtn) sttBtn.style.display = settingSttEnabled.checked ? 'flex' : 'none';
+        }
+        if (s.freshrss_enabled !== undefined && settingFreshrssEnabled) {
+          settingFreshrssEnabled.checked = s.freshrss_enabled === 'true';
+        }
+        if (s.freshrss_url && settingFreshrssUrl) settingFreshrssUrl.value = s.freshrss_url;
+        if (s.notion_enabled !== undefined && settingNotionEnabled) {
+          settingNotionEnabled.checked = s.notion_enabled === 'true';
+        }
+        if (s.notion_api_key && settingNotionApiKey) settingNotionApiKey.value = s.notion_api_key;
+        if (s.google_enabled !== undefined && settingGoogleEnabled) {
+          settingGoogleEnabled.checked = s.google_enabled === 'true';
+        }
+        if (s.nextcloud_enabled !== undefined && settingNextcloudEnabled) {
+          settingNextcloudEnabled.checked = s.nextcloud_enabled === 'true';
+        }
+
+        if (settingDebugMode) {
+          settingDebugMode.checked = debugManager.isDebugMode;
+        }
+
+        // Load full character profile fields from /api/characters/:id
+        try {
+          const charRes = await fetch(`/api/characters/${encodeURIComponent(currentChar.id)}`);
+          if (charRes.ok) {
+            const c = await charRes.json();
+            if (settingCharName) settingCharName.value = c.display_name || c.name || '';
+            if (settingCharNicknames) settingCharNicknames.value = Array.isArray(c.nicknames) ? c.nicknames.join(', ') : '';
+            if (settingCharTags) settingCharTags.value = Array.isArray(c.tags) ? c.tags.join(', ') : '';
+            if (settingOwnerName) settingOwnerName.value = c.owner?.name || s.owner_name || 'User';
+            if (settingOwnerPronoun) settingOwnerPronoun.value = c.owner?.pronoun || s.owner_pronoun || 'they';
+            if (settingTimezone) settingTimezone.value = c.timezone || s.timezone || '';
+            if (settingTzLabel) settingTzLabel.value = c.tz_label || s.tz_label || '';
+            if (settingCharLanguage) settingCharLanguage.value = c.language || 'en';
+            if (settingCharCountry) settingCharCountry.value = c.country || '';
+            if (settingCharDescription) settingCharDescription.value = c.description || '';
+            if (settingPersonality) settingPersonality.value = c.personality || s.personality || '';
+            if (settingCharScenario) settingCharScenario.value = c.scenario || '';
+            if (settingCharFirstMessage) settingCharFirstMessage.value = c.first_message || '';
+            if (settingCharExamples) settingCharExamples.value = Array.isArray(c.example_messages) && c.example_messages.length ? JSON.stringify(c.example_messages, null, 2) : '';
+            if (settingCharFeedKeywords) settingCharFeedKeywords.value = Array.isArray(c.feed_keywords) ? c.feed_keywords.join(', ') : '';
+            if (settingCharSongs) settingCharSongs.value = Array.isArray(c.songs) ? c.songs.join(', ') : '';
+            if (settingCharSongAliases) settingCharSongAliases.value = c.song_aliases && Object.keys(c.song_aliases).length ? JSON.stringify(c.song_aliases) : '';
+            if (settingCharSystemPrompt) settingCharSystemPrompt.value = c.system_prompt || '';
+          }
+        } catch {}
+
+        // Load current live mood score
+        try {
+          const moodRes = await fetch(`/api/characters/${encodeURIComponent(currentChar.id)}/mood`);
+          if (moodRes.ok) {
+            const m = await moodRes.json();
+            updateMoodBadge(m.score, m.bracket);
+          }
+        } catch {}
       }
     } catch {}
     if (settingZoomSlider && getModel()) {
@@ -978,7 +1533,42 @@ function setupUI(
   btnCloseSettings?.addEventListener('click', () => settingsModal.classList.remove('active'));
   btnCancelSettings?.addEventListener('click', () => settingsModal.classList.remove('active'));
 
+  // Wire Mood Card Actions in Settings
+  document.getElementById('btn-mood-cheer')?.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/interactions/touch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characterId: currentChar.id, area: 'head' })
+      });
+      const data = await res.json();
+      if (data?.bracket && data?.score !== undefined) {
+        updateMoodBadge(data.score, data.bracket);
+        showToast(`Cheered companion! Affection: ${data.score}`);
+      }
+    } catch {}
+  });
+
+  document.getElementById('btn-reset-mood')?.addEventListener('click', async () => {
+    try {
+      const res = await fetch(`/api/characters/${encodeURIComponent(currentChar.id)}/mood`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score: 70 })
+      });
+      const data = await res.json();
+      if (data?.bracket && data?.score !== undefined) {
+        updateMoodBadge(data.score, data.bracket);
+        showToast('Mood score reset to Cheerful (70)');
+      }
+    } catch {}
+  });
+
   btnSaveSettings?.addEventListener('click', async () => {
+    if (settingDebugMode) {
+      debugManager.setDebugMode(settingDebugMode.checked);
+    }
+
     const payload = {
       ai_provider: settingProvider.value,
       openai_base_url: settingBaseUrl.value,
@@ -999,8 +1589,90 @@ function setupUI(
       discord_bot_enabled: String(settingDiscordEnabled.checked),
       discord_bot_token: settingDiscordToken.value,
       discord_channel_id: settingDiscordChannel.value,
-      discord_allowed_id: settingDiscordAllowed.value
+      discord_allowed_id: settingDiscordAllowed.value,
+
+      owner_name: settingOwnerName?.value || 'User',
+      owner_pronoun: settingOwnerPronoun?.value || 'they',
+      timezone: settingTimezone?.value || '',
+      tz_label: settingTzLabel?.value || '',
+      personality: settingPersonality?.value || '',
+      timezone_enabled: String(settingTimezoneEnabled?.checked ?? true),
+      touch_enabled: String(settingTouchEnabled?.checked ?? true),
+      mood_enabled: String(settingMoodEnabled?.checked ?? true),
+      idle_talk_enabled: String(settingIdleTalkEnabled?.checked ?? false),
+      sleep_cycle_enabled: String(settingSleepCycleEnabled?.checked ?? false),
+      weather_enabled: String(settingWeatherEnabled?.checked ?? false),
+      weather_city: settingWeatherCity?.value || '',
+      llm_fallback_1: settingLlmFallback1?.value || '',
+      llm_fallback_2: settingLlmFallback2?.value || '',
+      stt_enabled: String(settingSttEnabled?.checked ?? false),
+      freshrss_enabled: String(settingFreshrssEnabled?.checked ?? false),
+      freshrss_url: settingFreshrssUrl?.value || '',
+      notion_enabled: String(settingNotionEnabled?.checked ?? false),
+      notion_api_key: settingNotionApiKey?.value || '',
+      google_enabled: String(settingGoogleEnabled?.checked ?? false),
+      nextcloud_enabled: String(settingNextcloudEnabled?.checked ?? false)
     };
+
+    if (sttBtn) {
+      sttBtn.style.display = settingSttEnabled?.checked ? 'flex' : 'none';
+    }
+
+    // Helper to safely parse JSON or return default fallback string
+    const safeJsonString = (val: string | undefined, fallback: string) => {
+      if (!val || !val.trim()) return fallback;
+      try {
+        return JSON.stringify(JSON.parse(val.trim()));
+      } catch {
+        return fallback;
+      }
+    };
+
+    // Save Character-specific Profile fields
+    const charUpdatePayload = {
+      display_name: settingCharName?.value.trim() || currentChar.name,
+      nicknames_json: JSON.stringify(
+        (settingCharNicknames?.value || '').split(',').map((s) => s.trim()).filter(Boolean)
+      ),
+      tags_json: JSON.stringify(
+        (settingCharTags?.value || '').split(',').map((s) => s.trim()).filter(Boolean)
+      ),
+      owner_json: JSON.stringify({
+        name: settingOwnerName?.value.trim() || 'User',
+        pronoun: settingOwnerPronoun?.value.trim() || 'they'
+      }),
+      timezone: settingTimezone?.value.trim() || '',
+      tz_label: settingTzLabel?.value.trim() || '',
+      language: settingCharLanguage?.value.trim() || 'en',
+      country: settingCharCountry?.value.trim() || '',
+      description: settingCharDescription?.value.trim() || '',
+      personality: settingPersonality?.value.trim() || '',
+      scenario: settingCharScenario?.value.trim() || '',
+      first_message: settingCharFirstMessage?.value.trim() || '',
+      example_messages_json: safeJsonString(settingCharExamples?.value, '[]'),
+      feed_keywords_json: JSON.stringify(
+        (settingCharFeedKeywords?.value || '').split(',').map((s) => s.trim()).filter(Boolean)
+      ),
+      songs_json: JSON.stringify(
+        (settingCharSongs?.value || '').split(',').map((s) => s.trim()).filter(Boolean)
+      ),
+      song_aliases_json: safeJsonString(settingCharSongAliases?.value, '{}'),
+      system_prompt: settingCharSystemPrompt?.value.trim() || ''
+    };
+
+    try {
+      await fetch(`/api/characters/${encodeURIComponent(currentChar.id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(charUpdatePayload)
+      });
+      currentChar.displayName = charUpdatePayload.display_name;
+      currentChar.name = charUpdatePayload.display_name;
+      updateCompanionHeader(currentChar, currentCostume);
+      populateCharacterSelector(characters, currentChar.id);
+    } catch (e: any) {
+      console.warn('[settings] Failed to save character profile:', e);
+    }
 
     await fetch('/api/settings', {
       method: 'PUT',
@@ -1017,7 +1689,9 @@ function setupWebSocket(
   stage: () => CompanionModel,
   lipSync: LipSync,
   switchCostume: (id: string) => Promise<void>,
-  triggerEmotion: (emotion: string) => void
+  triggerEmotion: (emotion: string) => void,
+  getCharacters: () => Character[],
+  getCurrentCharacter: () => Character
 ) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -1028,6 +1702,7 @@ function setupWebSocket(
 
     ws.onopen = () => {
       console.log('[ws] Connected to companion server');
+      debugManager.log('WS', 'Connected to companion server');
       showToast('Live link connected', 1500);
     };
 
@@ -1039,10 +1714,32 @@ function setupWebSocket(
         return;
       }
 
+      if (msg.type === 'debug_log' && msg.log) {
+        debugManager.log(msg.log.category, msg.log.title, msg.log.data, msg.log.timestamp);
+      } else if (msg.type !== 'stream_token') {
+        debugManager.log('WS', `Event: ${msg.type}`, msg);
+      }
+
       switch (msg.type) {
         case 'chat':
           if (msg.emotion) triggerEmotion(msg.emotion);
+          if (msg.motion) void stage().playMotion(msg.motion);
           if (msg.audio_url) lipSync.play(msg.audio_url).catch(console.error);
+          if (msg.reply && msg.message_id) {
+            appendMessageBubble('assistant', msg.reply, msg.emotion, msg.motion, msg.audio_url, msg.thought, msg.costume, msg.raw_content);
+          }
+          break;
+
+        case 'mood_update':
+          if (msg.score !== undefined) {
+            updateMoodBadge(msg.score, { emoji: msg.emoji, label: msg.label });
+          }
+          break;
+
+        case 'sleep_status':
+          if (companionSleepBadge) {
+            companionSleepBadge.style.display = (msg.asleep && settingSleepCycleEnabled?.checked) ? 'inline-flex' : 'none';
+          }
           break;
 
         case 'audio_continue':
@@ -1064,7 +1761,40 @@ function setupWebSocket(
           break;
 
         case 'change_costume':
-          if (msg.costume_id) void switchCostume(msg.costume_id);
+          if (msg.costume_id) {
+            const curChar = getCurrentCharacter();
+            if (msg.character_id && msg.character_id !== curChar.id) {
+              const targetChar = getCharacters().find((c) => c.id === msg.character_id);
+              if (targetChar) {
+                targetChar.activeCostumeId = msg.costume_id;
+                localStorage.setItem(`costume_${targetChar.id}`, msg.costume_id);
+              }
+            } else {
+              void switchCostume(msg.costume_id);
+            }
+          }
+          break;
+
+        case 'costume_renamed':
+          if (msg.costume_id && msg.name) {
+            const cur = getCurrentCharacter();
+            const targetChar = getCharacters().find((c) => c.id === msg.character_id) || cur;
+            const cs = targetChar.costumes.find(
+              (c) => c.id === msg.costume_id || (c as any).costume_slug === msg.costume_id
+            );
+            if (cs) cs.name = msg.name;
+            if (targetChar.id === cur.id) {
+              populateCostumeSelector(targetChar.costumes, cs?.id || msg.costume_id);
+              if (companionCostumeEl && cs) companionCostumeEl.textContent = cs.name;
+            }
+            showToast(`Outfit renamed: ${msg.name}`);
+          }
+          break;
+
+        case 'character_renamed':
+          if (msg.display_name) {
+            showToast(`Companion renamed: ${msg.display_name}`);
+          }
           break;
       }
     };

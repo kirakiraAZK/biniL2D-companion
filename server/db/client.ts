@@ -32,6 +32,20 @@ export interface CharacterRow {
   tts_speed: number;
   created_at: number;
   updated_at: number;
+  nicknames_json?: string;
+  feed_keywords_json?: string;
+  personality?: string;
+  scenario?: string;
+  first_message?: string;
+  example_messages_json?: string;
+  tags_json?: string;
+  owner_json?: string;
+  timezone?: string;
+  tz_label?: string;
+  language?: string;
+  country?: string;
+  songs_json?: string;
+  song_aliases_json?: string;
 }
 
 export interface CostumeRow {
@@ -89,6 +103,10 @@ class DatabaseManager {
 
   constructor() {
     this.db = new DatabaseSync(DB_PATH);
+    try {
+      this.db.exec('PRAGMA journal_mode = WAL;');
+      this.db.exec('PRAGMA busy_timeout = 5000;');
+    } catch {}
     this.initTables();
   }
 
@@ -148,6 +166,7 @@ class DatabaseManager {
         character_name TEXT,
         content TEXT NOT NULL,
         raw_content TEXT NOT NULL DEFAULT '',
+        thought TEXT,
         emotion TEXT,
         expression TEXT,
         motion TEXT,
@@ -172,7 +191,51 @@ class DatabaseManager {
         created_at INTEGER NOT NULL,
         FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
       );
+
+      CREATE TABLE IF NOT EXISTS runtime_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
     `);
+
+    // Ensure thought column exists for backwards compatibility
+    try {
+      this.db.exec('ALTER TABLE messages ADD COLUMN thought TEXT;');
+    } catch {}
+
+    // Character Card & Avatar-Server Column Migrations
+    const charCols = (this.db.prepare("PRAGMA table_info(characters)").all() as { name: string }[]).map(c => c.name);
+    const charSet = new Set(charCols);
+    const addCharCol = (col: string, type: string, def: string) => {
+      if (!charSet.has(col)) {
+        try { this.db.exec(`ALTER TABLE characters ADD COLUMN ${col} ${type} DEFAULT ${def};`); } catch {}
+      }
+    };
+    addCharCol('nicknames_json', 'TEXT', "'[]'");
+    addCharCol('feed_keywords_json', 'TEXT', "'[]'");
+    addCharCol('personality', 'TEXT', "''");
+    addCharCol('scenario', 'TEXT', "''");
+    addCharCol('first_message', 'TEXT', "''");
+    addCharCol('example_messages_json', 'TEXT', "'[]'");
+    addCharCol('tags_json', 'TEXT', "'[]'");
+    addCharCol('owner_json', 'TEXT', "'{\"name\":\"User\",\"pronoun\":\"they\"}'");
+    addCharCol('timezone', 'TEXT', "''");
+    addCharCol('tz_label', 'TEXT', "''");
+    addCharCol('language', 'TEXT', "'en'");
+    addCharCol('country', 'TEXT', "''");
+    addCharCol('songs_json', 'TEXT', "'[]'");
+    addCharCol('song_aliases_json', 'TEXT', "'{}'");
+
+    // Clean up any historical messages where <think> leaked into content
+    try {
+      this.db.exec(`
+        UPDATE messages
+        SET content = TRIM(SUBSTR(content, INSTR(content, '</think>') + 8))
+        WHERE content LIKE '%<think>%</think>%';
+        UPDATE messages SET content = TRIM(content);
+      `);
+    } catch {}
   }
 
   // --- Characters ---
@@ -195,6 +258,9 @@ class DatabaseManager {
           default_costume_id = ?, active_costume_id = ?, expressions_json = ?, motions_json = ?,
           ai_provider = ?, ai_model = ?, custom_base_url = ?, temperature = ?,
           tts_enabled = ?, tts_engine = ?, tts_voice = ?, tts_voice_ref = ?, tts_voice_instruct = ?, tts_speed = ?,
+          nicknames_json = ?, feed_keywords_json = ?, personality = ?, scenario = ?, first_message = ?,
+          example_messages_json = ?, tags_json = ?, owner_json = ?, timezone = ?, tz_label = ?,
+          language = ?, country = ?, songs_json = ?, song_aliases_json = ?,
           updated_at = ?
         WHERE id = ?
       `).run(
@@ -202,6 +268,9 @@ class DatabaseManager {
         updates.default_costume_id, updates.active_costume_id, updates.expressions_json, updates.motions_json,
         updates.ai_provider, updates.ai_model, updates.custom_base_url, updates.temperature,
         updates.tts_enabled, updates.tts_engine, updates.tts_voice, updates.tts_voice_ref, updates.tts_voice_instruct, updates.tts_speed,
+        updates.nicknames_json ?? '[]', updates.feed_keywords_json ?? '[]', updates.personality ?? '', updates.scenario ?? '', updates.first_message ?? '',
+        updates.example_messages_json ?? '[]', updates.tags_json ?? '[]', updates.owner_json ?? '{"name":"User","pronoun":"they"}', updates.timezone ?? '', updates.tz_label ?? '',
+        updates.language ?? 'en', updates.country ?? '', updates.songs_json ?? '[]', updates.song_aliases_json ?? '{}',
         updates.updated_at, updates.id
       );
     } else {
@@ -211,8 +280,11 @@ class DatabaseManager {
           default_costume_id, active_costume_id, expressions_json, motions_json,
           ai_provider, ai_model, custom_base_url, temperature,
           tts_enabled, tts_engine, tts_voice, tts_voice_ref, tts_voice_instruct, tts_speed,
+          nicknames_json, feed_keywords_json, personality, scenario, first_message,
+          example_messages_json, tags_json, owner_json, timezone, tz_label,
+          language, country, songs_json, song_aliases_json,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         char.id, char.name, char.display_name ?? char.name, char.description ?? '', char.system_prompt ?? '', char.model_dir ?? '',
         char.default_costume_id ?? '', char.active_costume_id ?? char.default_costume_id ?? '',
@@ -220,14 +292,60 @@ class DatabaseManager {
         char.ai_provider ?? 'openai', char.ai_model ?? '', char.custom_base_url ?? '', char.temperature ?? 0.75,
         char.tts_enabled ?? 1, char.tts_engine ?? 'omnivoice', char.tts_voice ?? 'ja-JP-NanamiNeural',
         char.tts_voice_ref ?? '', char.tts_voice_instruct ?? 'female, cheerful pitch', char.tts_speed ?? 1.0,
+        char.nicknames_json ?? '[]', char.feed_keywords_json ?? '[]', char.personality ?? '', char.scenario ?? '', char.first_message ?? '',
+        char.example_messages_json ?? '[]', char.tags_json ?? '[]', char.owner_json ?? '{"name":"User","pronoun":"they"}', char.timezone ?? '', char.tz_label ?? '',
+        char.language ?? 'en', char.country ?? '', char.songs_json ?? '[]', char.song_aliases_json ?? '{}',
         char.created_at ?? now, now
       );
+    }
+  }
+
+  // --- Runtime Settings (Feature Toggles) ---
+  getRuntimeSetting(key: string, defaultValue = ''): string {
+    try {
+      const row = this.db.prepare('SELECT value FROM runtime_settings WHERE key = ?').get(key) as { value: string } | undefined;
+      if (row && row.value !== undefined) return row.value;
+      const sRow = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+      if (sRow && sRow.value !== undefined) return sRow.value;
+      return process.env[key.toUpperCase()] ?? defaultValue;
+    } catch {
+      return process.env[key.toUpperCase()] ?? defaultValue;
+    }
+  }
+
+  isFeatureEnabled(key: string, defaultBool = false): boolean {
+    const val = this.getRuntimeSetting(key, defaultBool ? 'true' : 'false').toLowerCase();
+    return val === '1' || val === 'true' || val === 'yes';
+  }
+
+  setRuntimeSetting(key: string, value: string): void {
+    const now = Date.now();
+    this.db.prepare(`
+      INSERT INTO runtime_settings (key, value, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(key, value, now);
+  }
+
+  getAllRuntimeSettings(): Record<string, string> {
+    try {
+      const rows = this.db.prepare('SELECT key, value FROM runtime_settings').all() as { key: string; value: string }[];
+      const res: Record<string, string> = {};
+      for (const r of rows) res[r.key] = r.value;
+      return res;
+    } catch {
+      return {};
     }
   }
 
   setActiveCostume(characterId: string, costumeId: string): void {
     this.db.prepare('UPDATE characters SET active_costume_id = ?, updated_at = ? WHERE id = ?')
       .run(costumeId, Date.now(), characterId);
+  }
+
+  updateCharacterName(characterId: string, displayName: string): void {
+    this.db.prepare('UPDATE characters SET display_name = ?, updated_at = ? WHERE id = ?')
+      .run(displayName, Date.now(), characterId);
   }
 
   // --- Costumes ---
@@ -238,6 +356,13 @@ class DatabaseManager {
 
   getCostume(id: string): CostumeRow | undefined {
     return this.db.prepare('SELECT * FROM costumes WHERE id = ?').get(id) as unknown as CostumeRow | undefined;
+  }
+
+  renameCostume(characterId: string, costumeIdentifier: string, newName: string): void {
+    this.db.prepare(`
+      UPDATE costumes SET name = ?
+      WHERE character_id = ? AND (id = ? OR costume_slug = ?)
+    `).run(newName, characterId, costumeIdentifier, costumeIdentifier);
   }
 
   upsertCostume(costume: CostumeRow): void {
@@ -293,11 +418,11 @@ class DatabaseManager {
     this.db.prepare(`
       INSERT INTO messages (
         id, conversation_id, role, character_id, character_name, content, raw_content,
-        emotion, expression, motion, costume, audio_url, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        thought, emotion, expression, motion, costume, audio_url, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, msg.conversation_id, msg.role, msg.character_id ?? null, msg.character_name ?? null,
-      msg.content, msg.raw_content ?? msg.content, msg.emotion ?? null, msg.expression ?? null,
+      msg.content, msg.raw_content ?? msg.content, msg.thought ?? null, msg.emotion ?? null, msg.expression ?? null,
       msg.motion ?? null, msg.costume ?? null, msg.audio_url ?? null, now
     );
 

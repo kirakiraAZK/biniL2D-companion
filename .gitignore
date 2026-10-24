@@ -28,6 +28,7 @@ public/models/
 
 # Reference Repositories
 _references/
+references/
 
 # Environment variables & local secrets
 .env

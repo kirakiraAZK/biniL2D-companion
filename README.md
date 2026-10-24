@@ -8,8 +8,12 @@ A modern, localhost-first Full-Stack TypeScript application that evolves Live2D 
 
 ### 1. Reversed Split-Screen Web Dashboard
 - **Left Panel (Interactive Chat & Controls ~ 58%)**:
-  - Real-time streaming conversation with inline status pills (`THINKING`, `JOY`, `SAD`, etc.).
+  - Real-time streaming conversation with inline status pills (`THINKING`, `JOY`, `SAD`, `👔 OUTFIT`, etc.).
+  - Markdown formatting support: italic (`*emphasis*`), bold (`**strong**`), inline code, blockquotes, lists.
   - Character and outfit switcher with instant live switching.
+  - Non-destructive companion display name and outfit renaming (`✏️` buttons) preserving original disk paths.
+  - In-chat Raw AI Output inspection: inline `👁️ Raw` button on message bubbles plus header toggle `👁️` with 1-click clipboard copy.
+  - Developer Debug Console (`🐞` button in header) with live raw output telemetry, prompt payloads, event ring buffer, and engine state.
   - Persistent chat history backed by local SQLite.
   - Full-featured Tabbed Settings Modal (`🧠 AI Brain`, `🎙️ Voice & TTS`, `🎭 Live2D Stage`, `🤖 Bot Bridges`).
 - **Right Panel (WebGL Live2D Stage ~ 42%)**:
@@ -21,7 +25,17 @@ A modern, localhost-first Full-Stack TypeScript application that evolves Live2D 
 ### 2. Multi-Character & Outfits Management
 - Auto-detects and synchronizes all characters located in `./Characters/` directly into local SQLite persistence without manual registration.
 - Supports characters with multiple outfits and costumes (e.g. Tokoyami Towa with 4 costumes, Amane Kanata, etc.).
-- Switch costumes seamlessly via the top dropdown, on-screen controls, or through AI commands.
+- Independent active outfit memory per character: switching between characters preserves each companion's previously chosen outfit reliably.
+- Switch costumes seamlessly via the top dropdown, on-screen controls, or through AI commands (e.g. `[costume: uniq-0092-00]`).
+- Renaming characters and outfits updates SQLite and client UI dynamically without touching disk directory names.
+
+### 3. Developer Debug Mode & In-Chat Raw Inspection
+- **In-Chat Raw View**: Inspect the untouched, raw output from the AI model (including hidden reasoning `<think>`, emotions `[JOY]`, and costume tags) directly beneath any assistant message bubble or globally via the `👁️` button in the header.
+- **Developer Debug Console (`🐞`)**:
+  - **🤖 Raw AI Output**: Full unparsed model stream, provider, model name, response character length, and latency in milliseconds.
+  - **📜 Prompt Inspector**: View complete prompt payloads including system instructions, persona, solar clock, mood bracket, and conversation history.
+  - **📡 Live Event Log**: Chronological stream of all system telemetry (`AI`, `TTS`, `WS`, `MOOD`, `INTERACTION`, `SYSTEM`) with category filters and copy tools.
+  - **⚙️ Engine State**: Real-time snapshot of loaded characters, costumes, SQLite database paths, background services, and client counts.
 
 ### 3. Multi-Provider AI Brain
 - **OpenAI-Compatible Custom Endpoints**: Connect to local models (LM Studio, Ollama, vLLM, LocalAI) or cloud providers (OpenAI, Groq, OpenRouter, Together AI).

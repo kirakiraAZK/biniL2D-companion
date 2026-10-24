@@ -102,10 +102,26 @@ export async function loadRegistry(
 }
 
 export function pickCostume(character: Character, id?: string): Costume {
+  if (!character.costumes || character.costumes.length === 0) {
+    return { id: 'default', name: 'Default', model: '' };
+  }
+  const match = (targetId?: string): Costume | undefined => {
+    if (!targetId) return undefined;
+    const t = targetId.trim().toLowerCase();
+    return character.costumes.find(
+      (c) =>
+        c.id.toLowerCase() === t ||
+        (c as any).costume_slug?.toLowerCase() === t ||
+        c.id.toLowerCase().endsWith(`::${t}`) ||
+        t.endsWith(`::${c.id.toLowerCase()}`) ||
+        c.name.toLowerCase() === t
+    );
+  };
+
   return (
-    character.costumes.find((c) => c.id === id) ??
-    character.costumes.find((c) => c.id === character.activeCostumeId) ??
-    character.costumes.find((c) => c.id === character.defaultCostume) ??
+    match(id) ??
+    match(character.activeCostumeId) ??
+    match(character.defaultCostume) ??
     character.costumes[0]
   );
 }

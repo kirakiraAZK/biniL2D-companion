@@ -10,6 +10,7 @@ import { registerSettingsRoutes } from './routes/settings';
 import { registerChatRoutes } from './routes/chat';
 import { telegramBotBridge } from './bridges/telegram-bot';
 import { discordBotBridge } from './bridges/discord-bot';
+import { backgroundService } from './services/background';
 
 dotenv.config();
 
@@ -53,6 +54,9 @@ async function main() {
   // Start optional external bot bridges
   void telegramBotBridge.start();
   void discordBotBridge.start();
+
+  // Start autonomous background engine (polling & mood)
+  backgroundService.start();
 
   const PORT = Number(process.env.PORT || 8800);
   const HOST = process.env.HOST || '0.0.0.0';

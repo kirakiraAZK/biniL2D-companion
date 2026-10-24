@@ -4,11 +4,18 @@ import { streamOpenAI } from './adapters/openai';
 import { streamClaude } from './adapters/claude';
 import { streamGemini } from './adapters/gemini';
 
-export function streamAI(
+import { CharacterRow, dbManager } from '../db/client';
+import { PromptMessage } from './prompt-builder';
+import { streamOpenAI } from './adapters/openai';
+import { streamClaude } from './adapters/claude';
+import { streamGemini } from './adapters/gemini';
+
+function getProviderStream(
+  providerName: string,
   character: CharacterRow,
   messages: PromptMessage[]
 ): AsyncGenerator<string, void, unknown> {
-  const provider = (character.ai_provider || dbManager.getSetting('ai_provider') || 'openai').toLowerCase();
+  const provider = providerName.toLowerCase();
 
   if (provider === 'claude' || provider === 'anthropic') {
     const apiKey = dbManager.getSetting('anthropic_api_key') || process.env.ANTHROPIC_API_KEY;
@@ -41,4 +48,44 @@ export function streamAI(
     model,
     temperature: character.temperature
   });
+}
+
+export async function* streamAI(
+  character: CharacterRow,
+  messages: PromptMessage[]
+): AsyncGenerator<string, void, unknown> {
+  const primary = (character.ai_provider || dbManager.getSetting('ai_provider') || 'openai').toLowerCase();
+  const fallback1 = dbManager.getRuntimeSetting('llm_fallback_1', process.env.LLM_FALLBACK_1 || '').toLowerCase();
+  const fallback2 = dbManager.getRuntimeSetting('llm_fallback_2', process.env.LLM_FALLBACK_2 || '').toLowerCase();
+
+  const chain = [primary];
+  if (fallback1 && fallback1 !== primary) chain.push(fallback1);
+  if (fallback2 && !chain.includes(fallback2)) chain.push(fallback2);
+
+  let lastError: any = null;
+
+  for (let i = 0; i < chain.length; i++) {
+    const currentProvider = chain[i];
+    let yieldedAny = false;
+    try {
+      const generator = getProviderStream(currentProvider, character, messages);
+      for await (const chunk of generator) {
+        yieldedAny = true;
+        yield chunk;
+      }
+      return; // Stream succeeded
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[ai-provider] Provider '${currentProvider}' failed:`, err.message || err);
+      // If we already yielded tokens to the client, we cannot seamlessly fallback mid-stream
+      if (yieldedAny) {
+        throw err;
+      }
+      if (i < chain.length - 1) {
+        console.log(`[ai-provider] Attempting fallback to '${chain[i + 1]}'`);
+      }
+    }
+  }
+
+  throw lastError || new Error('All AI providers failed');
 }

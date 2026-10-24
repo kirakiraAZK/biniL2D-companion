@@ -18,6 +18,7 @@ export async function registerSettingsRoutes(app: FastifyInstance): Promise<void
     if (body && typeof body === 'object') {
       for (const [key, val] of Object.entries(body)) {
         dbManager.setSetting(key, String(val));
+        dbManager.setRuntimeSetting(key, String(val));
       }
       // Re-evaluate bridges in the background if bot settings were touched
       void telegramBotBridge.restart();

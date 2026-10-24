@@ -258,6 +258,55 @@
         border-color: rgba(16, 185, 129, 0.3);
       }
 
+      .tag-pill.costume {
+        background: rgba(245, 158, 11, 0.15);
+        color: #fbbf24;
+        border-color: rgba(245, 158, 11, 0.3);
+      }
+
+      .chat-code {
+        background: rgba(15, 23, 42, 0.65);
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        color: #e2e8f0;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+      }
+
+      .chat-code-block {
+        background: #0f172a;
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12.5px;
+        overflow-x: auto;
+        margin: 6px 0;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        color: #cbd5e1;
+      }
+
+      button.icon-mini-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-sub);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 12px;
+        flex-shrink: 0;
+        transition: all 0.15s ease;
+      }
+      button.icon-mini-btn:hover {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+      }
+
       .msg-bubble {
         padding: 14px 18px;
         border-radius: 14px;
@@ -278,6 +327,42 @@
         color: var(--text-bright);
         border: 1px solid var(--border-subtle);
         border-bottom-left-radius: 4px;
+      }
+
+      /* Collapsible Thought Process Box */
+      .thought-accordion {
+        margin-bottom: 8px;
+        background: rgba(15, 23, 42, 0.45);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 11.5px;
+        color: #94a3b8;
+      }
+
+      .thought-summary {
+        cursor: pointer;
+        user-select: none;
+        outline: none;
+        font-weight: 500;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .thought-summary:hover {
+        color: #cbd5e1;
+      }
+
+      .thought-body {
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(148, 163, 184, 0.1);
+        font-size: 11.5px;
+        line-height: 1.5;
+        color: #94a3b8;
+        white-space: pre-wrap;
       }
 
       .streaming-cursor {
@@ -314,20 +399,23 @@
 
       /* Chat Input */
       #chat-input-container {
-        padding: 16px 20px;
+        padding: 14px 20px 18px;
         background: var(--bg-panel);
         border-top: 1px solid var(--border-subtle);
       }
 
       .input-wrapper {
         display: flex;
-        align-items: flex-end;
+        align-items: center;
         gap: 10px;
         background: var(--bg-card);
         border: 1px solid var(--border-subtle);
-        border-radius: 12px;
-        padding: 10px 14px;
-        transition: border-color 0.2s;
+        border-radius: 14px;
+        padding: 8px 12px;
+        min-height: 52px;
+        box-sizing: border-box;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        cursor: text;
       }
 
       .input-wrapper:focus-within {
@@ -343,15 +431,28 @@
         color: #fff;
         font-family: inherit;
         font-size: 14.5px;
-        line-height: 1.45;
-        max-height: 130px;
+        line-height: 22px;
+        height: 24px;
+        min-height: 24px;
+        max-height: 120px;
+        padding: 1px 4px;
+        margin: 0;
         resize: none;
+        box-sizing: border-box;
+        cursor: text !important;
+        caret-color: #818cf8 !important; /* Bright, always-visible text insertion cursor */
+      }
+
+      #chat-input::placeholder {
+        color: var(--text-muted);
+        opacity: 0.8;
       }
 
       #send-btn {
         width: 36px;
         height: 36px;
-        border-radius: 8px;
+        flex-shrink: 0;
+        border-radius: 10px;
         background: var(--primary);
         border: none;
         color: #fff;
@@ -363,6 +464,63 @@
       }
       #send-btn:hover { background: var(--primary-hover); }
       #send-btn:active { transform: scale(0.95); }
+
+      .stt-btn {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        border-radius: 10px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-sub);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 15px;
+        transition: all 0.2s;
+      }
+      .stt-btn:hover {
+        background: var(--bg-card-hover);
+        color: #fff;
+      }
+      .stt-btn.recording {
+        background: rgba(239, 68, 68, 0.25);
+        border-color: #ef4444;
+        color: #fca5a5;
+        animation: pulseRecording 1.2s infinite;
+      }
+      @keyframes pulseRecording {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+      }
+
+      .mood-badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: rgba(99, 102, 241, 0.2);
+        border: 1px solid rgba(99, 102, 241, 0.4);
+        color: #c7d2fe;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+        white-space: nowrap;
+      }
+      .sleep-badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: rgba(147, 51, 234, 0.2);
+        border: 1px solid rgba(147, 51, 234, 0.4);
+        color: #e9d5ff;
+        font-weight: 600;
+        animation: pulseSleep 2s infinite ease-in-out;
+        white-space: nowrap;
+      }
+      @keyframes pulseSleep {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+      }
 
       /* === RIGHT PANEL: Live2D Stage (~ 42%) === */
       #stage-panel {
@@ -685,6 +843,311 @@
       }
       .btn-secondary:hover { background: var(--bg-card-hover); }
 
+      /* Debug Modal & Components */
+      #debug-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        animation: fadeIn 0.15s ease-out;
+      }
+      #debug-modal.active { display: flex; }
+
+      .debug-card {
+        max-width: 880px !important;
+        height: 650px !important;
+      }
+
+      .dbg-tab-content {
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+        flex: 1;
+        overflow: hidden;
+      }
+      .dbg-tab-content.active {
+        display: flex;
+      }
+
+      .dbg-meta-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+        color: var(--text-muted);
+        background: rgba(10, 12, 18, 0.6);
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border-subtle);
+        flex-wrap: wrap;
+      }
+      .dbg-meta-item strong {
+        color: #a5b4fc;
+      }
+
+      .dbg-code-container {
+        flex: 1;
+        overflow: auto;
+        background: #06070a;
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      .dbg-code-block {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        color: #e2e8f0;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .dbg-filter-group {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+
+      .dbg-filter-btn {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-muted);
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .dbg-filter-btn:hover {
+        color: var(--text-bright);
+        border-color: var(--border-active);
+      }
+      .dbg-filter-btn.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+      }
+
+      .dbg-logs-container {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px;
+        background: #06070a;
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11.5px;
+      }
+
+      .dbg-log-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        line-height: 1.4;
+      }
+      .dbg-log-row:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .dbg-log-time {
+        color: var(--text-muted);
+        white-space: nowrap;
+        font-size: 11px;
+      }
+      .dbg-log-cat {
+        font-size: 10px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .dbg-log-cat.AI { background: rgba(99, 102, 241, 0.2); color: #818cf8; }
+      .dbg-log-cat.WS { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+      .dbg-log-cat.TTS { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+      .dbg-log-cat.MOOD { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+      .dbg-log-cat.INTERACTION { background: rgba(14, 165, 233, 0.2); color: #38bdf8; }
+      .dbg-log-cat.SYSTEM { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+
+      .dbg-log-title {
+        color: var(--text-bright);
+        flex: 1;
+        word-break: break-word;
+      }
+
+      .tag-pill.raw-btn {
+        background: rgba(14, 165, 233, 0.15);
+        color: #38bdf8;
+        border: 1px solid rgba(14, 165, 233, 0.35);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .tag-pill.raw-btn:hover {
+        background: rgba(14, 165, 233, 0.3);
+        color: #fff;
+        border-color: #38bdf8;
+      }
+
+      /* In-bubble Debug Accordion */
+      .msg-debug-details {
+        margin-top: 10px;
+        border-top: 1px dashed rgba(99, 102, 241, 0.3);
+        padding-top: 8px;
+        font-size: 11.5px;
+      }
+      .msg-debug-summary {
+        cursor: pointer;
+        color: #818cf8;
+        font-weight: 600;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .msg-debug-summary:hover {
+        color: #a5b4fc;
+      }
+      .msg-debug-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 6px;
+        margin-bottom: 4px;
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+      .msg-debug-pre {
+        padding: 10px 12px;
+        background: #05070d;
+        border: 1px solid rgba(99, 102, 241, 0.25);
+        border-radius: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11.5px;
+        line-height: 1.5;
+        color: #cbd5e1;
+        white-space: pre-wrap;
+        word-break: break-word;
+        box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+      }
+      .btn-copy-raw-inline {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-sub);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10.5px;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .btn-copy-raw-inline:hover {
+        background: var(--primary);
+        color: #fff;
+      }
+
+      button#btn-toggle-raw-chat.active {
+        background: rgba(14, 165, 233, 0.25);
+        border-color: #0284c7;
+        color: #38bdf8;
+      }
+
+      button#btn-toggle-debug.active {
+        background: rgba(245, 158, 11, 0.25);
+        border-color: #f59e0b;
+        color: #fbbf24;
+      }
+
+      /* Mood Score Card in Profile Settings */
+      .mood-score-card {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);
+        border: 1px solid rgba(99, 102, 241, 0.35);
+        border-radius: 12px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      }
+      .mood-score-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .mood-score-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .mood-score-emoji {
+        font-size: 26px;
+        line-height: 1;
+        filter: drop-shadow(0 2px 6px rgba(236, 72, 153, 0.4));
+      }
+      .mood-score-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #f1f5f9;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .mood-score-badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: rgba(99, 102, 241, 0.25);
+        color: #a5b4fc;
+        border: 1px solid rgba(99, 102, 241, 0.4);
+        font-weight: 600;
+      }
+      .mood-score-sub {
+        font-size: 12px;
+        color: var(--text-muted);
+        display: block;
+        margin-top: 2px;
+      }
+      .mood-progress-bar {
+        width: 100%;
+        height: 8px;
+        background: rgba(15, 23, 42, 0.8);
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid var(--border-subtle);
+      }
+      .mood-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #6366f1 0%, #ec4899 100%);
+        border-radius: 6px;
+        transition: width 0.3s ease;
+      }
+      .btn-mini-action {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        color: var(--text-sub);
+        padding: 5px 11px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .btn-mini-action:hover {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
+      }
+
       /* Desktop Pet Window Support */
       html.pet, html.pet body { background: transparent !important; }
       html.pet #chat-panel, html.pet #stage-overlay, html.pet #status-toast { display: none !important; }
@@ -702,11 +1165,17 @@
               <div class="status-dot"></div>
             </div>
             <div class="companion-title">
-              <h2 id="companion-name">Amane Kanata</h2>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h2 id="companion-name">Amane Kanata</h2>
+                <span id="companion-mood-badge" class="mood-badge" style="display:none;" title="Current Companion Mood"></span>
+                <span id="companion-sleep-badge" class="sleep-badge" style="display:none;" title="Companion is asleep">💤 Asleep</span>
+              </div>
               <span id="companion-costume-label">Celestial Uniform</span>
             </div>
           </div>
           <div class="header-actions">
+            <button class="icon-btn" id="btn-toggle-raw-chat" title="Toggle Raw AI Output in Chat">👁️</button>
+            <button class="icon-btn" id="btn-toggle-debug" title="Developer Debug Console (View Raw AI Output & Logs)">🐞</button>
             <button class="icon-btn" id="btn-clear-chat" title="Clear Chat History">🗑️</button>
             <button class="icon-btn" id="btn-open-settings" title="Settings">⚙️</button>
           </div>
@@ -717,10 +1186,12 @@
           <div class="select-group">
             <span>Character:</span>
             <select id="select-character" class="custom-select" title="Switch Companion"></select>
+            <button id="btn-rename-character" class="icon-mini-btn" title="Rename Character">✏️</button>
           </div>
           <div class="select-group">
             <span>Outfit:</span>
             <select id="select-costume" class="custom-select" title="Switch Costume"></select>
+            <button id="btn-rename-costume" class="icon-mini-btn" title="Rename Outfit">✏️</button>
           </div>
         </div>
 
@@ -745,6 +1216,7 @@
               rows="1"
               placeholder="Send a message or ask to change costume..."
             ></textarea>
+            <button id="stt-btn" class="stt-btn" title="Voice Dictation (STT)" style="display:none;">🎙️</button>
             <button id="send-btn" title="Send (Enter)">➤</button>
           </div>
         </div>
@@ -799,7 +1271,9 @@
         <!-- Navigation Tabs -->
         <nav class="modal-tabs">
           <button class="tab-btn active" data-tab="tab-ai">🧠 AI Brain</button>
+          <button class="tab-btn" data-tab="tab-profile">👤 Profile</button>
           <button class="tab-btn" data-tab="tab-voice">🎙️ Voice & TTS</button>
+          <button class="tab-btn" data-tab="tab-autonomy">⚡ Features</button>
           <button class="tab-btn" data-tab="tab-stage">🎭 Live2D Stage</button>
           <button class="tab-btn" data-tab="tab-bot">🤖 Bot Bridges</button>
         </nav>
@@ -844,6 +1318,149 @@
               <label for="setting-temperature">Temperature (Creativity: 0.2 = focused, 0.9 = creative)</label>
               <input type="range" id="setting-temperature" min="0.1" max="1.5" step="0.05" value="0.75" />
               <span id="temp-display" style="font-size: 11px; color: var(--text-muted); align-self: flex-end;">0.75</span>
+            </div>
+
+            <div class="settings-group" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-subtle);">
+              <label>Failover / Fallback AI Providers (Optional)</label>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px;">
+                <div>
+                  <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Fallback 1</span>
+                  <select id="setting-llm-fallback-1">
+                    <option value="">None</option>
+                    <option value="gemini">Google Gemini</option>
+                    <option value="claude">Anthropic Claude</option>
+                    <option value="openai">OpenAI</option>
+                  </select>
+                </div>
+                <div>
+                  <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Fallback 2</span>
+                  <select id="setting-llm-fallback-2">
+                    <option value="">None</option>
+                    <option value="claude">Anthropic Claude</option>
+                    <option value="gemini">Google Gemini</option>
+                    <option value="openai">OpenAI</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: PROFILE -->
+          <div class="tab-content" id="tab-profile">
+            <!-- Live Mood & Affection Score -->
+            <div class="mood-score-card">
+              <div class="mood-score-header">
+                <div class="mood-score-info">
+                  <span class="mood-score-emoji" id="profile-mood-emoji">💖</span>
+                  <div>
+                    <div class="mood-score-title">
+                      <span>Companion Mood Score: </span>
+                      <strong id="profile-mood-number">70</strong><span style="color:var(--text-muted); font-size:12px;"> / 100</span>
+                      <span class="mood-score-badge" id="profile-mood-label">Cheerful</span>
+                    </div>
+                    <span class="mood-score-sub" id="profile-mood-desc">Content, playful, and responsive companion state.</span>
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <button type="button" class="btn-mini-action" id="btn-mood-cheer" title="Cheer companion up (+10)">💖 Cheer</button>
+                  <button type="button" class="btn-mini-action" id="btn-reset-mood" title="Reset mood to neutral (70)">↺ Reset</button>
+                </div>
+              </div>
+              <div class="mood-progress-bar">
+                <div class="mood-progress-fill" id="profile-mood-fill" style="width: 70%;"></div>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <label for="setting-char-name">Companion Display Name</label>
+              <input type="text" id="setting-char-name" placeholder="Companion name..." />
+            </div>
+
+            <div class="settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="settings-group">
+                <label for="setting-char-nicknames">Nicknames (comma-separated)</label>
+                <input type="text" id="setting-char-nicknames" placeholder="e.g. towa, towati" />
+              </div>
+              <div class="settings-group">
+                <label for="setting-char-tags">Tags (comma-separated)</label>
+                <input type="text" id="setting-char-tags" placeholder="e.g. companion, ai, avatar" />
+              </div>
+            </div>
+
+            <div class="settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="settings-group">
+                <label for="setting-owner-name">Owner Name (Your Name)</label>
+                <input type="text" id="setting-owner-name" placeholder="User" />
+              </div>
+              <div class="settings-group">
+                <label for="setting-owner-pronoun">Owner Pronoun</label>
+                <input type="text" id="setting-owner-pronoun" placeholder="they / he / she" />
+              </div>
+            </div>
+
+            <div class="settings-grid" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 12px;">
+              <div class="settings-group">
+                <label for="setting-timezone">Timezone (IANA Name)</label>
+                <input type="text" id="setting-timezone" placeholder="e.g. Asia/Jakarta, America/New_York" />
+              </div>
+              <div class="settings-group">
+                <label for="setting-tz-label">Label</label>
+                <input type="text" id="setting-tz-label" placeholder="WIB / EST" />
+              </div>
+              <div class="settings-group">
+                <label for="setting-char-language">Language</label>
+                <input type="text" id="setting-char-language" placeholder="en" />
+              </div>
+              <div class="settings-group">
+                <label for="setting-char-country">Country</label>
+                <input type="text" id="setting-char-country" placeholder="ID" />
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <label for="setting-char-description">Character Description</label>
+              <textarea id="setting-char-description" rows="2" placeholder="A brief description of who this character is..."></textarea>
+            </div>
+
+            <div class="settings-group">
+              <label for="setting-personality">Personality Traits</label>
+              <textarea id="setting-personality" rows="2" placeholder="Key personality traits, comma-separated (e.g. friendly, playful, slightly teasing, supportive...)"></textarea>
+            </div>
+
+            <div class="settings-group">
+              <label for="setting-char-scenario">Setting & Scenario Context</label>
+              <textarea id="setting-char-scenario" rows="2" placeholder="The setting and context for conversations, personal schedule, local customs, routines..."></textarea>
+            </div>
+
+            <div class="settings-group">
+              <label for="setting-char-first-message">First Greeting Message</label>
+              <input type="text" id="setting-char-first-message" placeholder="e.g. [HAPPY] Oh, you're here! What's the plan?" />
+            </div>
+
+            <div class="settings-group">
+              <label for="setting-char-examples">Example Messages (Dialogue Few-Shot JSON)</label>
+              <textarea id="setting-char-examples" rows="3" placeholder='[{"role": "user", "content": "Hi!"}, {"role": "assistant", "content": "[HAPPY] Hey! What&#39;s up?"}]'></textarea>
+            </div>
+
+            <div class="settings-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div class="settings-group">
+                <label for="setting-char-feed-keywords">News & RSS Feed Keywords</label>
+                <input type="text" id="setting-char-feed-keywords" placeholder="e.g. technology, space, gaming" />
+              </div>
+              <div class="settings-group">
+                <label for="setting-char-songs">Songs Repertoire (comma-separated)</label>
+                <input type="text" id="setting-char-songs" placeholder="e.g. Song 1, Song 2" />
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <label for="setting-char-song-aliases">Song Aliases (JSON Key-Value)</label>
+              <input type="text" id="setting-char-song-aliases" placeholder='{"alias": "actual song title"}' />
+            </div>
+
+            <div class="settings-group">
+              <label for="setting-char-system-prompt">System Prompt Override (Optional)</label>
+              <textarea id="setting-char-system-prompt" rows="3" placeholder="Custom system instructions or token overrides (e.g. {{CHARACTER_NAME}}, {{OWNER_NAME}})..."></textarea>
             </div>
           </div>
 
@@ -899,6 +1516,124 @@
                 <option value="en-US-AnaNeural">English - Ana (Female)</option>
                 <option value="en-US-JennyNeural">English - Jenny (Female)</option>
               </select>
+            </div>
+          </div>
+
+          <!-- TAB: FEATURES & AUTONOMY TOGGLES -->
+          <div class="tab-content" id="tab-autonomy">
+            <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
+              Toggle optional companion capabilities. Disabled features consume zero background CPU or network resources.
+            </p>
+
+            <label class="switch-label">
+              <div>
+                <strong style="font-size: 13.5px; display: block;">Time & Clock Awareness</strong>
+                <span style="font-size: 12px; color: var(--text-muted);">Injects local time, day of week, and absence gap alerts into prompt</span>
+              </div>
+              <input type="checkbox" id="setting-timezone-enabled" checked />
+            </label>
+
+            <label class="switch-label" style="margin-top: 14px;">
+              <div>
+                <strong style="font-size: 13.5px; display: block;">Interactive Touch & Poking</strong>
+                <span style="font-size: 12px; color: var(--text-muted);">Clicking the character's head or body triggers expressive reactions</span>
+              </div>
+              <input type="checkbox" id="setting-touch-enabled" checked />
+            </label>
+
+            <label class="switch-label" style="margin-top: 14px;">
+              <div>
+                <strong style="font-size: 13.5px; display: block;">Dynamic Mood Engine</strong>
+                <span style="font-size: 12px; color: var(--text-muted);">Tracks companion mood (0–100) reacting to compliments, insults, and pokes</span>
+              </div>
+              <input type="checkbox" id="setting-mood-enabled" />
+            </label>
+
+            <label class="switch-label" style="margin-top: 14px;">
+              <div>
+                <strong style="font-size: 13.5px; display: block;">Autonomous Idle Talk</strong>
+                <span style="font-size: 12px; color: var(--text-muted);">Proactively speaks when user is quiet after 30 minutes</span>
+              </div>
+              <input type="checkbox" id="setting-idle-talk-enabled" />
+            </label>
+
+            <label class="switch-label" style="margin-top: 14px;">
+              <div>
+                <strong style="font-size: 13.5px; display: block;">Sleep Mode Cycle</strong>
+                <span style="font-size: 12px; color: var(--text-muted);">Auto-sleeps between 00:00 and 05:00 local time with sleepy reactions</span>
+              </div>
+              <input type="checkbox" id="setting-sleep-cycle-enabled" />
+            </label>
+
+            <label class="switch-label" style="margin-top: 14px;">
+              <div>
+                <strong style="font-size: 13.5px; display: block;">Developer Debug Mode</strong>
+                <span style="font-size: 12px; color: var(--text-muted);">Displays raw AI output under messages & enables deep debug telemetry</span>
+              </div>
+              <input type="checkbox" id="setting-debug-mode" />
+            </label>
+
+            <label class="switch-label" style="margin-top: 14px;">
+              <div>
+                <strong style="font-size: 13.5px; display: block;">Weather Forecast Tool</strong>
+                <span style="font-size: 12px; color: var(--text-muted);">Allows companion to check real-time weather and temperature</span>
+              </div>
+              <input type="checkbox" id="setting-weather-enabled" />
+            </label>
+
+            <div class="settings-group" style="margin-top: 12px;">
+              <label for="setting-weather-city">Weather City / Location</label>
+              <input type="text" id="setting-weather-city" placeholder="e.g. Jakarta, Tokyo, London" />
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
+              <h4 style="font-size: 13.5px; font-weight: 600; color: #818cf8; margin-bottom: 12px;">Work & External Connectors</h4>
+
+              <label class="switch-label">
+                <div>
+                  <strong style="font-size: 13.5px; display: block;">Voice Dictation (STT)</strong>
+                  <span style="font-size: 12px; color: var(--text-muted);">Displays microphone button for browser voice-to-text dictation</span>
+                </div>
+                <input type="checkbox" id="setting-stt-enabled" />
+              </label>
+
+              <label class="switch-label" style="margin-top: 14px;">
+                <div>
+                  <strong style="font-size: 13.5px; display: block;">FreshRSS News Feed</strong>
+                  <span style="font-size: 12px; color: var(--text-muted);">Fetches news matching character feed keywords for idle thoughts</span>
+                </div>
+                <input type="checkbox" id="setting-freshrss-enabled" />
+              </label>
+              <div class="settings-group" style="margin-top: 8px;">
+                <input type="text" id="setting-freshrss-url" placeholder="FreshRSS URL (e.g. http://localhost:8080)" />
+              </div>
+
+              <label class="switch-label" style="margin-top: 14px;">
+                <div>
+                  <strong style="font-size: 13.5px; display: block;">Notion Workspace Tasks</strong>
+                  <span style="font-size: 12px; color: var(--text-muted);">Syncs tasks & notes from connected Notion databases</span>
+                </div>
+                <input type="checkbox" id="setting-notion-enabled" />
+              </label>
+              <div class="settings-group" style="margin-top: 8px;">
+                <input type="password" id="setting-notion-api-key" placeholder="Notion API Key (secret_...)" />
+              </div>
+
+              <label class="switch-label" style="margin-top: 14px;">
+                <div>
+                  <strong style="font-size: 13.5px; display: block;">Google Suite / Calendar</strong>
+                  <span style="font-size: 12px; color: var(--text-muted);">Checks unread emails and upcoming calendar reminders</span>
+                </div>
+                <input type="checkbox" id="setting-google-enabled" />
+              </label>
+
+              <label class="switch-label" style="margin-top: 14px;">
+                <div>
+                  <strong style="font-size: 13.5px; display: block;">Nextcloud CalDAV</strong>
+                  <span style="font-size: 12px; color: var(--text-muted);">Syncs reminders from personal CalDAV calendar</span>
+                </div>
+                <input type="checkbox" id="setting-nextcloud-enabled" />
+              </label>
             </div>
           </div>
 
@@ -989,6 +1724,85 @@
         <div class="modal-footer">
           <button class="btn-secondary" id="btn-cancel-settings">Cancel</button>
           <button class="btn-primary" id="btn-save-settings">Save All Settings</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVELOPER DEBUG CONSOLE MODAL -->
+    <div id="debug-modal">
+      <div class="modal-card debug-card">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <h3>🛠️ Developer Debug Console</h3>
+            <span class="tag-pill" id="dbg-live-pill" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4);">LIVE</span>
+          </div>
+          <button class="icon-btn" id="btn-close-debug">✕</button>
+        </div>
+
+        <nav class="modal-tabs">
+          <button class="tab-btn active" data-dbg-tab="dbg-tab-raw">🤖 Raw AI Output</button>
+          <button class="tab-btn" data-dbg-tab="dbg-tab-prompt">📜 Prompt Inspector</button>
+          <button class="tab-btn" data-dbg-tab="dbg-tab-logs">📡 Live Event Log</button>
+          <button class="tab-btn" data-dbg-tab="dbg-tab-state">⚙️ Engine State</button>
+        </nav>
+
+        <div class="modal-body">
+          <!-- TAB 1: RAW AI OUTPUT -->
+          <div class="dbg-tab-content active" id="dbg-tab-raw">
+            <div class="dbg-meta-bar">
+              <span class="dbg-meta-item">Provider: <strong id="dbg-raw-provider">-</strong></span>
+              <span class="dbg-meta-item">Model: <strong id="dbg-raw-model">-</strong></span>
+              <span class="dbg-meta-item">Latency: <strong id="dbg-raw-latency">-</strong></span>
+              <span class="dbg-meta-item">Raw Length: <strong id="dbg-raw-length">0 chars</strong></span>
+              <button class="dock-pill" id="btn-copy-raw" style="margin-left: auto;">📋 Copy Raw</button>
+            </div>
+            <div class="dbg-code-container">
+              <pre id="dbg-raw-output" class="dbg-code-block">Waiting for model output... Send a message or wait for idle talk to see the exact raw stream.</pre>
+            </div>
+          </div>
+
+          <!-- TAB 2: PROMPT INSPECTOR -->
+          <div class="dbg-tab-content" id="dbg-tab-prompt">
+            <div class="dbg-meta-bar">
+              <span>Full Prompt Payload & Context sent to LLM</span>
+              <button class="dock-pill" id="btn-copy-prompt" style="margin-left: auto;">📋 Copy Prompt</button>
+            </div>
+            <div class="dbg-code-container">
+              <pre id="dbg-prompt-output" class="dbg-code-block">No prompt generated yet.</pre>
+            </div>
+          </div>
+
+          <!-- TAB 3: LIVE EVENT LOG -->
+          <div class="dbg-tab-content" id="dbg-tab-logs">
+            <div class="dbg-meta-bar">
+              <div class="dbg-filter-group">
+                <button class="dbg-filter-btn active" data-cat="ALL">All</button>
+                <button class="dbg-filter-btn" data-cat="AI">AI</button>
+                <button class="dbg-filter-btn" data-cat="TTS">TTS</button>
+                <button class="dbg-filter-btn" data-cat="WS">WebSocket</button>
+                <button class="dbg-filter-btn" data-cat="MOOD">Mood</button>
+                <button class="dbg-filter-btn" data-cat="INTERACTION">Interaction</button>
+              </div>
+              <div style="margin-left: auto; display: flex; gap: 6px;">
+                <button class="dock-pill" id="btn-clear-dbg-logs">🗑️ Clear</button>
+                <button class="dock-pill" id="btn-copy-dbg-logs">📋 Copy</button>
+              </div>
+            </div>
+            <div id="dbg-logs-stream" class="dbg-logs-container">
+              <!-- Log items rendered here -->
+            </div>
+          </div>
+
+          <!-- TAB 4: ENGINE STATE -->
+          <div class="dbg-tab-content" id="dbg-tab-state">
+            <div class="dbg-meta-bar">
+              <span>Companion Engine Snapshot & Runtime Memory</span>
+              <button class="dock-pill" id="btn-refresh-dbg-state" style="margin-left: auto;">🔄 Refresh State</button>
+            </div>
+            <div class="dbg-code-container">
+              <pre id="dbg-state-output" class="dbg-code-block">Loading state...</pre>
+            </div>
+          </div>
         </div>
       </div>
     </div>
