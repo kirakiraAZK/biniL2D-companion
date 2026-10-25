@@ -13,7 +13,10 @@ export async function* streamOpenAI(
 ): AsyncGenerator<string, void, unknown> {
   const apiKey = options.apiKey || process.env.OPENAI_API_KEY || '';
   const rawBase = options.baseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-  const baseUrl = rawBase.replace(/\/+$/, '');
+  let baseUrl = rawBase.replace(/\/+$/, '');
+  if (!/\/v1$/i.test(baseUrl) && !baseUrl.includes('/api/')) {
+    baseUrl = `${baseUrl}/v1`;
+  }
   const model = options.model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
   const temperature = options.temperature ?? 0.7;
 

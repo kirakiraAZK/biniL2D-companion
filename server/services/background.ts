@@ -6,6 +6,7 @@ import { streamAI } from '../ai/provider-factory';
 import { StreamTagParser } from '../parser/stream-tag-parser';
 import { ttsManager } from '../tts/tts-manager';
 import { wsHub } from '../ws/ws-hub';
+import { buildSystemPrompt } from '../ai/prompt-builder';
 
 class BackgroundService {
   private timer: NodeJS.Timeout | null = null;
@@ -105,8 +106,30 @@ class BackgroundService {
 
   private async triggerIdleTalk(character: any): Promise<void> {
     const conv = dbManager.getOrCreateConversation(character.id);
+    const lang = (character.language || 'en').toLowerCase();
 
-    // Build unprompted idle prompt
+    // Owner context
+    let ownerName = 'User';
+    try {
+      if (character.owner_json) {
+        const parsed = JSON.parse(character.owner_json);
+        if (parsed.name) ownerName = parsed.name;
+      }
+    } catch {}
+
+    // Weather context if enabled
+    let weatherContext: string | null = null;
+    let weatherSummary = '';
+    if (dbManager.isFeatureEnabled('weather_enabled', false)) {
+      try {
+        weatherContext = await weatherService.getWeatherPromptContext();
+        weatherSummary = await weatherService.formatWeatherSummary();
+      } catch (err: any) {
+        console.warn('[background] Failed to get weather for idle talk:', err.message);
+      }
+    }
+
+    // Build unprompted idle prompt matching character language
     let idlePrompt = '';
     const roll = Math.random();
 
@@ -115,37 +138,63 @@ class BackgroundService {
       const memories = dbManager.getMemories(character.id, 5);
       if (memories.length > 0) {
         const mem = memories[Math.floor(Math.random() * memories.length)];
-        idlePrompt = `You remembered something about your user: "${mem.fact}". Bring it up naturally or tease them about it. Exactly ONE in-character spoken sentence. Start with an emotion tag like [HAPPY] or [SURPRISED].`;
+        if (lang === 'id') {
+          idlePrompt = `[AUTONOMOUS IDLE TRIGGER]: Kamu tiba-tiba teringat tentang user-mu (${ownerName}): "${mem.fact}". Sapa atau goda mereka secara spontan dan akrab dalam Bahasa Indonesia santai (gunakan 'aku/kamu', partikel 'nih/dong/kan/lho'). Tepat SATU kalimat pendek yang manis atau agak jahil (playful). Selalu awali dengan SATU emotion tag seperti [HAPPY] atau [SURPRISED].`;
+        } else {
+          idlePrompt = `[AUTONOMOUS IDLE TRIGGER]: You suddenly remembered something about your companion (${ownerName}): "${mem.fact}". Bring it up naturally or tease them about it. Exactly ONE short in-character spoken sentence. Always start with ONE emotion tag like [HAPPY] or [SURPRISED].`;
+        }
       }
-    } else if (roll < 0.7 && dbManager.isFeatureEnabled('weather_enabled', false)) {
+    } else if (roll < 0.7 && weatherSummary) {
       // Weather comment
-      const summary = await weatherService.formatWeatherSummary();
-      if (summary) {
-        idlePrompt = `Current weather outside: ${summary}. Make a casual, in-character comment about the weather. Exactly ONE spoken sentence. Start with an emotion tag like [HAPPY] or [THINKING].`;
+      if (lang === 'id') {
+        idlePrompt = `[AUTONOMOUS IDLE TRIGGER]: Cuaca di luar saat ini: ${weatherSummary}. Berikan satu komentar spontan dan santai tentang cuaca ini atau ingatkan user (${ownerName}) dalam Bahasa Indonesia santai (gunakan 'aku/kamu', partikel 'nih/ya/lho'). Tepat SATU kalimat pendek. Selalu awali dengan SATU emotion tag seperti [HAPPY] atau [THINKING].`;
+      } else {
+        idlePrompt = `[AUTONOMOUS IDLE TRIGGER]: Current weather outside: ${weatherSummary}. Make a casual, in-character comment about the weather to ${ownerName}. Exactly ONE short spoken sentence. Always start with ONE emotion tag like [HAPPY] or [THINKING].`;
       }
     }
 
     if (!idlePrompt) {
       // Random thought / time comment
       const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      idlePrompt = `It is currently ${timeStr}. Your user has been quiet for a while. Say something spontaneous, teasing, humming, or comment on the time. Exactly ONE spoken sentence. Start with an emotion tag.`;
+      let timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      try {
+        const tz = character.timezone || dbManager.getRuntimeSetting('timezone', '');
+        if (tz) {
+          timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: tz });
+        }
+      } catch {}
+
+      if (lang === 'id') {
+        idlePrompt = `[AUTONOMOUS IDLE TRIGGER]: Waktu menunjukkan pukul ${timeStr}. User (${ownerName}) sudah terdiam cukup lama di depan layar monitor. Sapa mereka secara spontan, tanyakan sedang sibuk apa, bersenandung, atau goda dengan santai dalam Bahasa Indonesia santai (gunakan 'aku/kamu', partikel 'nih/dong/ya'). Tepat SATU kalimat pendek yang ekspresif. Selalu awali dengan SATU emotion tag.`;
+      } else {
+        idlePrompt = `[AUTONOMOUS IDLE TRIGGER]: It is currently ${timeStr}. Your user (${ownerName}) has been quiet for a while. Say something spontaneous, teasing, humming, or comment on the time. Exactly ONE short spoken sentence. Always start with ONE emotion tag.`;
+      }
     }
 
-    const messages = [
-      {
-        role: 'system' as const,
-        content: `You are ${character.display_name || character.name}. You are talking directly to your companion. Always start with an emotion tag like [HAPPY], [SAD], [SURPRISED], [ANGRY], [THINKING], or [NEUTRAL]. Keep it to exactly 1 short sentence.`
-      },
-      {
-        role: 'user' as const,
-        content: `[SYSTEM AUTONOMOUS TRIGGER]: ${idlePrompt}`
-      }
+    // Build system prompt using character definition, personality, language, and guidelines
+    const systemPrompt = buildSystemPrompt(character, { weatherContext });
+
+    // Include recent 2-4 messages from conversation history for conversational continuity
+    const historyRows = dbManager.getMessages(conv.id, 4);
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      { role: 'system', content: systemPrompt }
     ];
+
+    for (const h of historyRows) {
+      if (h.role === 'user' || h.role === 'assistant') {
+        messages.push({ role: h.role, content: h.content });
+      }
+    }
+
+    messages.push({
+      role: 'user',
+      content: idlePrompt
+    });
 
     let fullCleanText = '';
     let chosenEmotion = 'HAPPY';
     let chosenMotion: string | undefined;
+    let detectedCostumeSlug: string | undefined;
 
     const parser = new StreamTagParser({
       onCleanToken: (token) => {
@@ -154,6 +203,7 @@ class BackgroundService {
       onTag: (tag) => {
         if (tag.type === 'emotion') chosenEmotion = tag.value;
         if (tag.type === 'motion') chosenMotion = tag.value;
+        if (tag.type === 'costume') detectedCostumeSlug = tag.value;
       }
     });
 
@@ -165,6 +215,27 @@ class BackgroundService {
 
     const cleanReply = (result.cleanText || fullCleanText).trim();
     if (!cleanReply) return;
+
+    // Handle outfit change if triggered during idle talk
+    const costumeSlug = result.costume || detectedCostumeSlug;
+    if (costumeSlug) {
+      const costumes = dbManager.getCostumesForCharacter(character.id);
+      const matched = costumes.find(
+        c => c.costume_slug.toLowerCase() === costumeSlug.toLowerCase() ||
+             c.name.toLowerCase() === costumeSlug.toLowerCase()
+      );
+      if (matched && matched.id !== character.active_costume_id) {
+        dbManager.updateCharacter(character.id, { active_costume_id: matched.id });
+        wsHub.broadcast({
+          type: 'costume_changed',
+          character_id: character.id,
+          costume_id: matched.id,
+          costume_slug: matched.costume_slug,
+          costume_name: matched.name,
+          model_path: matched.model_path
+        });
+      }
+    }
 
     // TTS synthesis if enabled
     let audioUrl: string | null = null;
@@ -200,8 +271,11 @@ class BackgroundService {
       emotion: result.emotion || chosenEmotion,
       motion: result.motion || chosenMotion,
       audio_url: audioUrl,
+      costume: costumeSlug || undefined,
+      raw_content: result.rawText,
       character_id: character.id,
-      message_id: savedMsg.id
+      message_id: savedMsg.id,
+      created_at: savedMsg.created_at
     });
 
     console.log(`[background] Autonomous idle talk spoken: "${cleanReply}"`);

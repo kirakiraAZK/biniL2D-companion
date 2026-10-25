@@ -699,6 +699,73 @@ function renderNewsCard(container: HTMLElement, newsData: any) {
   container.appendChild(card);
 }
 
+function renderCostumeCard(container: HTMLElement, costumeSlugOrName: string, characterName?: string) {
+  if (!container || !costumeSlugOrName) return;
+  if (container.querySelector('.chat-costume-card')) return;
+
+  const card = document.createElement('div');
+  card.className = 'chat-rich-card chat-costume-card';
+
+  const header = document.createElement('div');
+  header.className = 'rich-card-header-row';
+  header.innerHTML = `
+    <div class="rich-card-title-wrap">
+      <span>👗</span> <span>Costume Change</span>
+    </div>
+    <div class="rich-card-badge" style="background: rgba(168, 85, 247, 0.2); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.45);">
+      Active Outfit
+    </div>
+  `;
+  card.appendChild(header);
+
+  // Look up character and costume details
+  const curChar = (window as any).__getCurrentChar ? (window as any).__getCurrentChar() : null;
+  const target = costumeSlugOrName.toLowerCase().trim();
+  const matched = curChar?.costumes?.find((c: any) =>
+    c.id.toLowerCase() === target ||
+    (c as any).costume_slug?.toLowerCase() === target ||
+    c.name.toLowerCase() === target ||
+    c.id.toLowerCase().endsWith(`::${target}`) ||
+    c.name.toLowerCase().includes(target) ||
+    target.includes(c.name.toLowerCase()) ||
+    c.id.toLowerCase().includes(target) ||
+    (target.includes('summer') && c.name.toLowerCase().includes('summer')) ||
+    (target.includes('casual') && c.name.toLowerCase().includes('casual')) ||
+    (target.includes('biasa') && (c.name.toLowerCase().includes('biasa') || c.id.includes('nrml') || c.id.includes('cmmn')))
+  );
+
+  const displayName = matched ? matched.name : costumeSlugOrName;
+  const slug = matched ? matched.id : costumeSlugOrName;
+  const charDisplay = characterName || curChar?.displayName || curChar?.name || 'Companion';
+
+  const bodyRow = document.createElement('div');
+  bodyRow.className = 'costume-card-body';
+  bodyRow.innerHTML = `
+    <div class="costume-icon-box">✨👘</div>
+    <div class="costume-info-box">
+      <div class="costume-name-text">${escapeHtml(displayName)}</div>
+      <div class="costume-sub-text">${escapeHtml(charDisplay)} • <code>${escapeHtml(slug)}</code></div>
+    </div>
+  `;
+  card.appendChild(bodyRow);
+
+  const actionRow = document.createElement('div');
+  actionRow.className = 'costume-card-action-row';
+
+  const switchBtn = document.createElement('button');
+  switchBtn.type = 'button';
+  switchBtn.className = 'costume-switch-btn';
+  switchBtn.innerHTML = `<span>👗 Switch Outfit</span>`;
+  switchBtn.onclick = () => {
+    const fn = (window as any).__switchCostume;
+    if (fn) fn(slug).catch(console.error);
+  };
+  actionRow.appendChild(switchBtn);
+  card.appendChild(actionRow);
+
+  container.appendChild(card);
+}
+
 function renderRichCard(container: HTMLElement, cardType: string, data: any) {
   if (!container || !data) return;
   if (cardType === 'weather') {
@@ -711,6 +778,8 @@ function renderRichCard(container: HTMLElement, cardType: string, data: any) {
     renderNewsCard(container, data);
   } else if (cardType === 'music') {
     renderMusicCard(container, data);
+  } else if (cardType === 'costume') {
+    renderCostumeCard(container, data);
   }
 }
 
@@ -893,7 +962,13 @@ async function main() {
         c.id.toLowerCase() === target ||
         (c as any).costume_slug?.toLowerCase() === target ||
         c.name.toLowerCase() === target ||
-        c.id.toLowerCase().endsWith(`::${target}`)
+        c.id.toLowerCase().endsWith(`::${target}`) ||
+        c.name.toLowerCase().includes(target) ||
+        target.includes(c.name.toLowerCase()) ||
+        c.id.toLowerCase().includes(target) ||
+        (target.includes('summer') && c.name.toLowerCase().includes('summer')) ||
+        (target.includes('casual') && c.name.toLowerCase().includes('casual')) ||
+        (target.includes('biasa') && (c.name.toLowerCase().includes('biasa') || c.id.includes('nrml') || c.id.includes('cmmn')))
     );
     if (!next || isSwitchingCostume || next.id === currentCostume.id) return;
     isSwitchingCostume = true;
@@ -939,6 +1014,7 @@ async function main() {
     }
   };
   (window as any).__switchCostume = switchCostume;
+  (window as any).__getCurrentChar = () => currentCharacter;
 
   // Character Switcher function
   const switchCharacter = async (charId: string): Promise<void> => {
@@ -1674,6 +1750,10 @@ function appendMessageBubble(
     }
   }
 
+  if (costume) {
+    renderCostumeCard(bubble, costume);
+  }
+
   row.appendChild(meta);
   row.appendChild(bubble);
 
@@ -1799,6 +1879,7 @@ function setupUI(
       let receivedAudioUrl = '';
       let receivedThought = '';
       let receivedMusicTrack: any = null;
+      let receivedCostume: string = '';
       let receivedCards: Array<{ type: string; data: any }> = [];
       let doneData: any = null;
       let isError = false;
@@ -1829,6 +1910,9 @@ function setupUI(
                 receivedMusicTrack = data.track;
                 renderMusicCard(pendingBubble, data.track);
                 chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+              } else if (data.type === 'costume') {
+                receivedCostume = data.costume;
+                void onSwitchCostume(data.costume);
               } else if (data.type === 'card') {
                 if (data.cardType && data.data && !receivedCards.some(rc => rc.type === data.cardType)) {
                   receivedCards.push({ type: data.cardType, data: data.data });
@@ -1896,9 +1980,11 @@ function setupUI(
                 if (data.message?.motion) {
                   metaHtml += `<span class="tag-pill motion">${data.message.motion}</span>`;
                 }
-                if (data.message?.costume) {
-                  metaHtml += `<span class="tag-pill costume">👔 ${data.message.costume}</span>`;
-                  void onSwitchCostume(data.message.costume);
+                const cos = data.message?.costume || data.costume;
+                if (cos) {
+                  receivedCostume = cos;
+                  metaHtml += `<span class="tag-pill costume">👔 ${cos}</span>`;
+                  void onSwitchCostume(cos);
                 }
                 const replyTime = data.message?.created_at ? formatBubbleTimestamp(data.message.created_at) : timeInfo;
                 metaHtml += `<span class="msg-time" title="${replyTime.title}">${replyTime.display}</span>`;
@@ -1948,6 +2034,11 @@ function setupUI(
         for (const c of receivedCards) {
           renderRichCard(pendingBubble, c.type, c.data);
         }
+      }
+
+      if (receivedCostume || doneData?.message?.costume || doneData?.costume) {
+        const c = receivedCostume || doneData?.message?.costume || doneData?.costume;
+        renderCostumeCard(pendingBubble, c);
       }
 
       // In Debug / Raw Mode: Show collapsible original raw AI output with inline copy and pill toggle
@@ -2170,21 +2261,43 @@ function setupUI(
       const data = await res.json();
       if (data.ok && Array.isArray(data.models) && data.models.length > 0) {
         settingModelSelect.innerHTML = '<option value="">-- Choose Fetched Model --</option>';
+
+        const combos: string[] = Array.isArray(data.combos) ? data.combos : [];
+        if (combos.length > 0) {
+          const comboGroup = document.createElement('optgroup');
+          comboGroup.label = '✨ Custom Combos (9Router Fallback Sequences)';
+          for (const c of combos) {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = `🌟 ${c} (Combo)`;
+            if (settingModel.value === c) opt.selected = true;
+            comboGroup.appendChild(opt);
+          }
+          settingModelSelect.appendChild(comboGroup);
+        }
+
+        const modelGroup = document.createElement('optgroup');
+        modelGroup.label = combos.length > 0 ? '🌐 Upstream Provider Models' : 'Available Models';
         for (const m of data.models) {
+          if (combos.includes(m)) continue;
           const opt = document.createElement('option');
           opt.value = m;
           opt.textContent = m;
-          settingModelSelect.appendChild(opt);
+          if (settingModel.value === m) opt.selected = true;
+          modelGroup.appendChild(opt);
         }
+        settingModelSelect.appendChild(modelGroup);
         settingModelSelect.style.display = 'block';
+
         if (modelFetchStatus) {
           modelFetchStatus.style.background = 'rgba(16, 185, 129, 0.15)';
           modelFetchStatus.style.border = '1px solid rgba(16, 185, 129, 0.4)';
           modelFetchStatus.style.color = '#6ee7b7';
-          modelFetchStatus.innerHTML = `✓ <strong>Discovered ${data.models.length} model(s)</strong>! Pick one below or type manually.`;
+          const comboNotice = combos.length > 0 ? ` (including <strong>${combos.length} combo(s)</strong> pinned at top)` : '';
+          modelFetchStatus.innerHTML = `✓ <strong>Discovered ${data.models.length} model(s)</strong>${comboNotice}! Pick one below or type manually.`;
         }
-        showToast(`Found ${data.models.length} model(s)!`);
-        debugManager.log('AI', `Fetched ${data.models.length} models for ${settingProvider.value}`);
+        showToast(`Found ${data.models.length} model(s)${combos.length ? ` (${combos.length} combo)` : ''}!`);
+        debugManager.log('AI', `Fetched ${data.models.length} models for ${settingProvider.value}`, { combos, total: data.models.length });
       } else {
         const errMsg = data.error || 'Endpoint returned no models or invalid response format.';
         if (modelFetchStatus) {

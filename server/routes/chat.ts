@@ -258,6 +258,7 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
     let firstSentenceSent = false;
     let firstAudioUrl: string | null = null;
     let resolvedMusicTrack: TrackInfo | null = null;
+    let detectedCostumeSlug: string = '';
     const resolvedCards: Array<{ type: 'weather' | 'calendar' | 'tasks' | 'news'; data: any }> = [];
 
     const emitCard = async (cardType: 'weather' | 'calendar' | 'tasks' | 'news', value?: string) => {
@@ -331,10 +332,18 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
             c.costume_slug.toLowerCase() === valLower ||
             c.id.toLowerCase() === valLower ||
             c.name.toLowerCase() === valLower ||
-            c.id.toLowerCase().endsWith(`::${valLower}`)
+            c.id.toLowerCase().endsWith(`::${valLower}`) ||
+            c.name.toLowerCase().includes(valLower) ||
+            valLower.includes(c.name.toLowerCase()) ||
+            c.costume_slug.toLowerCase().includes(valLower) ||
+            (valLower.includes('summer') && c.name.toLowerCase().includes('summer')) ||
+            (valLower.includes('casual') && c.name.toLowerCase().includes('casual')) ||
+            (valLower.includes('biasa') && (c.name.toLowerCase().includes('biasa') || c.costume_slug.includes('nrml') || c.costume_slug.includes('cmmn')))
           );
           const resolvedSlug = matched ? matched.costume_slug : tag.value;
+          detectedCostumeSlug = resolvedSlug;
           dbManager.setActiveCostume(character.id, resolvedSlug);
+          reply.raw.write(`data: ${JSON.stringify({ type: 'costume', costume: resolvedSlug })}\n\n`);
           wsHub.broadcast({
             type: 'change_costume',
             character_id: character.id,
@@ -485,7 +494,55 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
         await emitCard('news');
       }
 
-      // Save assistant message to database with persisted cards and music
+      // Hybrid Fallback: Auto-detect costume change if user requested it or AI agreed, but tag was omitted or flushed
+      let finalCostume = detectedCostumeSlug || result.costume || '';
+      const characterCostumes = dbManager.getCostumesForCharacter(character.id);
+      if (!finalCostume) {
+        const costumeKeywords = /\b(ganti|ubah|pakai|gantiin|switch|change|wear|costume|outfit|baju|kostum|pakaian)\b/i;
+        if (costumeKeywords.test(combinedLower)) {
+          for (const c of characterCostumes) {
+            const nameLower = c.name.toLowerCase();
+            const slugLower = c.costume_slug.toLowerCase();
+            const isMatch =
+              combinedLower.includes(nameLower) ||
+              combinedLower.includes(slugLower) ||
+              (nameLower.includes('summer') && (combinedLower.includes('summer') || combinedLower.includes('pantai') || combinedLower.includes('renang'))) ||
+              (nameLower.includes('casual') && (combinedLower.includes('casual') || combinedLower.includes('santai'))) ||
+              ((nameLower.includes('cmmn') || nameLower.includes('nrml') || nameLower.includes('default')) && (combinedLower.includes('biasa') || combinedLower.includes('normal') || combinedLower.includes('awal') || combinedLower.includes('asli')));
+            if (isMatch) {
+              finalCostume = c.costume_slug;
+              break;
+            }
+          }
+        }
+      }
+
+      if (finalCostume) {
+        const valLower = finalCostume.trim().toLowerCase();
+        const matched = characterCostumes.find(c =>
+          c.costume_slug.toLowerCase() === valLower ||
+          c.id.toLowerCase() === valLower ||
+          c.name.toLowerCase() === valLower ||
+          c.id.toLowerCase().endsWith(`::${valLower}`) ||
+          c.name.toLowerCase().includes(valLower) ||
+          valLower.includes(c.name.toLowerCase()) ||
+          c.costume_slug.toLowerCase().includes(valLower) ||
+          (valLower.includes('summer') && c.name.toLowerCase().includes('summer')) ||
+          (valLower.includes('casual') && c.name.toLowerCase().includes('casual')) ||
+          (valLower.includes('biasa') && (c.name.toLowerCase().includes('biasa') || c.costume_slug.includes('nrml') || c.costume_slug.includes('cmmn')))
+        );
+        const resolvedSlug = matched ? matched.costume_slug : finalCostume;
+        finalCostume = resolvedSlug;
+        dbManager.setActiveCostume(character.id, resolvedSlug);
+        wsHub.broadcast({
+          type: 'change_costume',
+          character_id: character.id,
+          costume_id: resolvedSlug,
+          name: matched ? matched.name : resolvedSlug
+        });
+      }
+
+      // Save assistant message to database with persisted cards, music, and costume
       const assistantMsg = dbManager.addMessage({
         conversation_id: conv.id,
         role: 'assistant',
@@ -497,7 +554,7 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
         emotion: result.emotion,
         expression: result.expression,
         motion: result.motion,
-        costume: result.costume,
+        costume: finalCostume,
         audio_url: firstAudioUrl,
         cards_json: JSON.stringify(resolvedCards),
         music_track_json: resolvedMusicTrack ? JSON.stringify(resolvedMusicTrack) : ''
@@ -511,7 +568,7 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
           reply: result.cleanText,
           emotion: result.emotion,
           motion: result.motion,
-          costume: result.costume,
+          costume: finalCostume,
           thought: result.thoughtText,
           raw_content: result.rawText,
           audio_url: firstAudioUrl,
@@ -528,13 +585,14 @@ export async function registerChatRoutes(app: FastifyInstance): Promise<void> {
         thought: result.thoughtText,
         music_track: resolvedMusicTrack,
         cards: resolvedCards,
+        costume: finalCostume,
         debug: {
           raw_output: result.rawText,
           clean_text: result.cleanText,
           thought_text: result.thoughtText,
           emotion: result.emotion,
           motion: result.motion,
-          costume: result.costume,
+          costume: finalCostume,
           provider: character.ai_provider,
           model: character.ai_model,
           latency_ms: latencyMs,

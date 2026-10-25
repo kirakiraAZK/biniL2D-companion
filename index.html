@@ -1625,6 +1625,61 @@
         white-space: nowrap;
       }
 
+      /* 5. Costume Change Card */
+      .chat-costume-card {
+        background: linear-gradient(135deg, rgba(30, 27, 75, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+        border: 1.5px solid rgba(168, 85, 247, 0.45);
+      }
+      .costume-card-body {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .costume-icon-box {
+        font-size: 32px;
+        line-height: 1;
+        filter: drop-shadow(0 2px 8px rgba(168, 85, 247, 0.5));
+      }
+      .costume-info-box {
+        flex: 1;
+        min-width: 0;
+      }
+      .costume-name-text {
+        font-size: 15px;
+        font-weight: 700;
+        color: #f3e8ff;
+      }
+      .costume-sub-text {
+        font-size: 11px;
+        color: #c084fc;
+        margin-top: 2px;
+      }
+      .costume-card-action-row {
+        display: flex;
+        justify-content: flex-end;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .costume-switch-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        background: rgba(168, 85, 247, 0.2);
+        border: 1px solid rgba(168, 85, 247, 0.4);
+        border-radius: 8px;
+        color: #e9d5ff;
+        font-size: 11.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .costume-switch-btn:hover {
+        background: rgba(168, 85, 247, 0.35);
+        border-color: rgba(168, 85, 247, 0.6);
+        color: #ffffff;
+      }
+
       .tag-pill.raw-btn {
         background: rgba(14, 165, 233, 0.15);
         color: #38bdf8;

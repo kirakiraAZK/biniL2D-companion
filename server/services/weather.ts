@@ -263,10 +263,10 @@ class WeatherService {
     if (!data) return null;
 
     const todayF = data.forecast[0]
-      ? `Today max ${data.forecast[0].temp_max}°C / min ${data.forecast[0].temp_min}°C (${data.forecast[0].description}${data.forecast[0].rain_chance > 0 ? `, ${data.forecast[0].rain_chance}% rain` : ''})`
+      ? `Today: Maximum Temperature ${data.forecast[0].temp_max}°C, Minimum Temperature ${data.forecast[0].temp_min}°C (${data.forecast[0].description}${data.forecast[0].rain_chance > 0 ? `, ${data.forecast[0].rain_chance}% rain` : ''})`
       : '';
     const tomorrowF = data.forecast[1]
-      ? `Tomorrow max ${data.forecast[1].temp_max}°C / min ${data.forecast[1].temp_min}°C (${data.forecast[1].description}${data.forecast[1].rain_chance > 0 ? `, ${data.forecast[1].rain_chance}% rain` : ''})`
+      ? `Tomorrow: Maximum Temperature ${data.forecast[1].temp_max}°C, Minimum Temperature ${data.forecast[1].temp_min}°C (${data.forecast[1].description}${data.forecast[1].rain_chance > 0 ? `, ${data.forecast[1].rain_chance}% rain` : ''})`
       : '';
     const forecastStr = [todayF, tomorrowF].filter(Boolean).join(' | ');
 

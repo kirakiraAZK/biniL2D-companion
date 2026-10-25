@@ -199,6 +199,11 @@ export class StreamTagParser {
         /\[(?:costume|outfit|motion|expression|emotion|music|song|track|weather|calendar|schedule|events|tasks|notion|todo|news|feed|articles)(?::[^\]]+)?\]/gi,
         ''
       )
+      .replace(/最高温/g, 'suhu tertinggi ')
+      .replace(/最低温/g, 'suhu terendah ')
+      .replace(/最高気温/g, 'suhu maksimum ')
+      .replace(/最低気温/g, 'suhu minimum ')
+      .replace(/всё蔽\s*/g, '')
       .trim();
 
     return {

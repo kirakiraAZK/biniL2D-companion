@@ -4,12 +4,6 @@ import { streamOpenAI } from './adapters/openai';
 import { streamClaude } from './adapters/claude';
 import { streamGemini } from './adapters/gemini';
 
-import { CharacterRow, dbManager } from '../db/client';
-import { PromptMessage } from './prompt-builder';
-import { streamOpenAI } from './adapters/openai';
-import { streamClaude } from './adapters/claude';
-import { streamGemini } from './adapters/gemini';
-
 function getProviderStream(
   providerName: string,
   character: CharacterRow,
